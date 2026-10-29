@@ -81,7 +81,7 @@ fi
 
 echo "==> 安装依赖"
 pip install -q --upgrade pip >/dev/null 2>&1 || true
-pip install -q -r requirements.txt
+pip install -q -r requirements-dev.txt
 
 free_port "$PORT"
 

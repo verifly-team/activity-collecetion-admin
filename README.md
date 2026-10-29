@@ -187,7 +187,7 @@ HOST=0.0.0.0 ./run-demo.sh                      # 服务器上对外预览
 ### ② 本地连真实库
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # 含测试依赖
 DATABASE_URL='mysql://exporter:密码@127.0.0.1:3306/verifly_signup?charset=utf8mb4' \
 UPLOAD_DIR=/verifly/activity/uploads \
 EXPORT_TOKEN=你的token \
@@ -318,7 +318,7 @@ docker logs verifly-export 2>&1 | grep AUDIT
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -q                 # 24 个用例
+pytest -q                 # 26 个用例
 ruff check app tests
 ruff format --check app tests
 python -m app.demo        # 本地预览
