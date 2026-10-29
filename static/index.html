@@ -196,11 +196,86 @@
   .confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
 
   .hidden{display:none !important}
-  @media(max-width:900px){
-    .stats{grid-template-columns:1fr}
-    .actionbar-in{flex-wrap:wrap}
-    .wrap{padding:18px 16px 190px}
-    .topbar-in{padding:0 16px}
+  /* ---------------- 平板 ---------------- */
+  @media(max-width:1100px){
+    .table-scroll{max-height:calc(100vh - 360px)}
+    .stats .stat{padding:16px 18px}
+    .stat .v{font-size:26px}
+  }
+
+  /* ---------------- 手机：表格改成卡片 ---------------- */
+  @media(max-width:780px){
+    .topbar-in{height:64px;padding:0 14px;gap:12px}
+    .brand-bar img{height:34px}
+    .brand-tag{padding-left:12px;font-size:11px}
+    .brand-tag em{font-size:8px}
+    .pill{padding:5px 9px;font-size:10px}
+    .btn{min-height:36px;padding:0 14px;font-size:12px}
+
+    .wrap{padding:16px 14px 200px}
+
+    .stats{grid-template-columns:1fr;gap:0;background:transparent;border:0}
+    .stat{border:1px solid var(--line);margin-top:-1px;padding:14px 16px}
+    .stat .v{font-size:24px;margin-top:2px}
+
+    .filters{flex-direction:column;align-items:stretch;gap:14px;padding-bottom:16px}
+    .field,.field--grow{max-width:none;width:100%}
+    .date-range{gap:8px}
+    .date-range .input{flex:1;width:auto;min-width:0}
+    .chips{width:100%}
+    .chip{flex:1;padding:8px 0;text-align:center}
+    .filter-actions{margin-left:0;width:100%}
+    .filter-actions .btn{flex:1}
+
+    /* 表头隐藏，每行变成一张卡 */
+    .table-scroll{max-height:none;overflow:visible}
+    table{min-width:0;display:block}
+    thead{display:none}
+    tbody{display:block}
+    tbody tr{display:grid;grid-template-columns:1fr auto;gap:0 12px;
+      padding:12px 14px;border-bottom:1px solid var(--line)}
+    tbody tr.sel{background:var(--paper)}
+    tbody td{border:0;padding:3px 0;display:flex;align-items:center;
+      justify-content:space-between;gap:14px;min-width:0;grid-column:1 / -1}
+    tbody td::before{content:attr(data-label);font-family:var(--display);font-size:9px;
+      font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+      flex:none}
+    tbody td.col-check{grid-column:2;grid-row:1;justify-content:flex-end;
+      align-self:start;padding:0 0 6px}
+    tbody td.col-check::before{display:none}
+    tbody td.col-brand{grid-column:1;grid-row:1;padding:0 0 6px;
+      justify-content:flex-start;font-size:15px}
+    tbody td.col-brand::before{display:none}
+    tbody td.col-brand strong{font-weight:600}
+    tbody td.phone-cell{justify-content:flex-start}
+    tbody td.phone-cell .phone-text{margin-left:auto}
+    tbody td.phone-cell .eye{margin-left:8px}
+    tbody td[data-label="ID"],
+    tbody td[data-label="提交时间"]{color:var(--muted);font-size:12px}
+    tbody td[data-label="提交时间"]{margin-top:-2px}
+
+    .pager{flex-wrap:wrap;justify-content:center;gap:8px;padding:14px}
+    .pager .spacer{display:none}
+
+    .actionbar-in{padding:12px 14px;gap:10px;flex-wrap:wrap}
+    .selinfo{width:100%;font-size:12px}
+    .selinfo .size{margin-left:0;padding-left:0;border-left:0}
+    .selinfo .size::before{content:"·";margin:0 8px;color:var(--line)}
+    .actionbar-in .spacer{display:none}
+    .actionbar-in .btn{flex:1;min-height:42px}
+
+    .modal-card,.modal-card.confirm{padding:22px 20px;max-width:none;width:100%}
+    .confirm-stat > div{padding:10px 10px}
+    .confirm-stat strong{font-size:16px}
+    .confirm-actions .btn{flex:1}
+    #toasts{left:14px;right:14px;transform:none}
+    .toast{width:100%;text-align:center}
+  }
+
+  @media(max-width:420px){
+    .brand-tag{display:none}
+    .stat .v{font-size:21px}
+    tbody td::before{font-size:8.5px}
   }
   </style>
 </head>
@@ -490,20 +565,20 @@
           : '<span class="tag none">无附件</span>';
         const on = state.selected.has(it.id);
         return `<tr class="${on ? 'sel' : ''}" data-id="${it.id}">
-          <td><input type="checkbox" class="cb row-cb" data-id="${it.id}" ${on ? 'checked' : ''}></td>
-          <td class="mono muted">${it.id}</td>
-          <td class="mono">${fmtTime(it.created_at)}</td>
-          <td><strong>${esc(it.brand_name)}</strong></td>
-          <td>${esc(it.contact_name || '—')}</td>
-          <td class="mono phone-cell" data-id="${it.id}">
+          <td class="col-check"><input type="checkbox" class="cb row-cb" data-id="${it.id}" ${on ? 'checked' : ''}></td>
+          <td class="mono muted" data-label="ID">${it.id}</td>
+          <td class="mono" data-label="提交时间">${fmtTime(it.created_at)}</td>
+          <td class="col-brand" data-label="品牌 / 店铺"><strong>${esc(it.brand_name)}</strong></td>
+          <td data-label="联系人">${esc(it.contact_name || '—')}</td>
+          <td class="mono phone-cell" data-id="${it.id}" data-label="手机">
             <span class="phone-text">${esc(maskPhone(it.phone))}</span>
             ${it.phone ? `<button type="button" class="eye" title="查看完整号码" aria-label="查看完整号码">${EYE.off}</button>` : ''}
           </td>
-          <td>${esc(it.city || '—')}</td>
-          <td>${zones || '—'}</td>
-          <td>${cats || '—'}</td>
-          <td class="mono">${it.expected_qty ?? '—'}</td>
-          <td class="nowrap">${files}</td>
+          <td data-label="城市">${esc(it.city || '—')}</td>
+          <td data-label="意向区域">${zones || '—'}</td>
+          <td data-label="经营品类">${cats || '—'}</td>
+          <td class="mono" data-label="带货件数">${it.expected_qty ?? '—'}</td>
+          <td class="nowrap" data-label="附件">${files}</td>
         </tr>`;
       }).join('');
       tb.querySelectorAll('.row-cb').forEach((cb) => {

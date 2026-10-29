@@ -18,6 +18,7 @@
 ![登录](docs/screenshot-login.png)
 ![主界面](docs/screenshot-main.png)
 ![手机号展开](docs/screenshot-phone.png)
+![移动端](docs/screenshot-mobile.png)
 ![导出二次确认](docs/screenshot-confirm.png)
 
 ---
@@ -80,6 +81,7 @@ docker compose up -d --build      # 或 docker run，见 docs/DEPLOY.md
 | 表格 | ID、时间、品牌、联系人、**手机（接口返回即脱敏，点眼睛才调接口取完整号）**、城市、意向区域、经营品类、带货件数、**附件数与大小** |
 | 勾选 | 单条勾选 / 全选本页；**达上限后其余复选框自动置灰** |
 | 底部操作条 | `已选 3 / 10 条 · 合计 5.3 MB` + 「导出 Excel」「打包下载 ZIP（含附件）」 |
+| 手机（≤780px） | 表格自动变成**卡片**：品牌名 + 勾选框一行，其余字段「标签 — 值」两列；筛选区竖排、按钮通栏 |
 | 安全阀 | 附件合计超过 `MAX_EXPORT_MB` 时，打包按钮自动禁用 |
 | 导出确认 | 点导出/打包先弹确认框：显示已选条数、附件数、体积，并提示「会读取线上库与附件目录，可能影响线上响应速度」 |
 
