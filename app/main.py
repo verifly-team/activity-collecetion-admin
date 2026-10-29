@@ -70,7 +70,7 @@ _DOCS = {
 
 app = FastAPI(
     title="66th 参展申请导出服务",
-    version="1.4.1",
+    version="1.4.2",
     description=DESCRIPTION,
     lifespan=lifespan,
     **_DOCS,
