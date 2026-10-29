@@ -23,6 +23,15 @@
 
 ---
 
+## 0. 上线与运维
+
+完整流程（数据库准备 → 构建推送 → 部署验收 → 日常运维 → 回滚）见
+**[deploy/RUNBOOK.md](deploy/RUNBOOK.md)**。
+
+审计日志查询：`./deploy/audit.sh`（`summary` / `zip` / `xlsx` / `phone` / `aborted` / `ids 12` / `today`）。
+
+---
+
 ## 1. 先看效果（不用数据库）
 
 ```bash
