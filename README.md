@@ -143,7 +143,68 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ---
 
-## 7. 为什么它影响不到采集服务
+## 7. 三种启动方式
+
+### ① 本地预览（造数据，不用连库）
+
+```bash
+./run-demo.sh                                   # → http://127.0.0.1:8010/?token=demo
+PORT=8020 ./run-demo.sh                         # 换端口
+HOST=0.0.0.0 ./run-demo.sh                      # 服务器上对外预览
+```
+
+### ② 本地连真实库
+
+```bash
+pip install -r requirements.txt
+DATABASE_URL='mysql://exporter:密码@127.0.0.1:3306/verifly_signup?charset=utf8mb4' \
+UPLOAD_DIR=/opt/verifly/uploads \
+EXPORT_TOKEN=你的token \
+uvicorn app.main:app --host 127.0.0.1 --port 8010
+```
+
+### ③ 服务器（Docker）
+
+```bash
+# 构建推送
+./deploy/build-push.sh 1.1.0
+
+# 启动（自动带 :ro 只读挂载、资源限额、健康检查）
+./deploy/run.sh /opt/verifly/export.env
+```
+
+`/opt/verifly/export.env` 至少要有：
+
+```ini
+DATABASE_URL=mysql://exporter:<密码>@127.0.0.1:3306/verifly_signup?charset=utf8mb4
+EXPORT_TOKEN=<长随机串>
+```
+
+---
+
+## 8. 启动失败怎么查
+
+先看容器/进程日志：
+
+```bash
+docker logs --tail 30 verifly-export      # Docker
+# 或直接跑前台看报错
+python -m uvicorn app.main:app --port 8010
+```
+
+| 报错 | 原因 | 处理 |
+|---|---|---|
+| `ModuleNotFoundError: No module named 'openpyxl'` | **镜像太旧**（1.0.0 没有 Excel 依赖） | 重新 `docker build`，用 `1.1.0` |
+| `ModuleNotFoundError: No module named 'app'` | 不在项目根目录跑 | `cd` 到 `export-service/` 目录 |
+| `服务未配置 EXPORT_TOKEN，已禁用导出`（503） | `.env` 没填 token | 填上 `EXPORT_TOKEN` 再重启 |
+| `/healthz` 返回 503 | 数据库连不上 | 查 `DATABASE_URL`、账号权限、网络 |
+| `Address already in use` | 端口被占 | 换端口：`PORT=8020` 或 `--port 8020` |
+| 页面白屏 | 地址少了 token | 用 `/?token=xxx`，或先在登录框输入 |
+| 打包 413 | 勾选附件合计超上限 | 减少勾选，或调大 `MAX_EXPORT_MB` |
+
+---
+
+## 9. 为什么它影响不到采集服务
 
 | # | 措施 |
 |---|---|
@@ -156,7 +217,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ---
 
-## 8. 开发
+## 10. 开发
 
 ```bash
 pip install -r requirements-dev.txt
