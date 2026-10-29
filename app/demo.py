@@ -1,6 +1,6 @@
 """一键 DEMO：造一批假数据 + 起服务，用来预览界面。
 
-python -m app.demo            # 造数据并启动，浏览器打开 http://127.0.0.1:8001/?token=demo
+python -m app.demo            # 造数据并启动，浏览器打开 http://127.0.0.1:8010/?token=demo
 python -m app.demo --reset    # 清掉旧数据重造
 """
 
@@ -150,7 +150,8 @@ def seed(reset: bool) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="导出后台 DEMO")
     parser.add_argument("--reset", action="store_true", help="清掉旧数据重新生成")
-    parser.add_argument("--port", type=int, default=8001)
+    parser.add_argument("--port", type=int, default=8010)
+    parser.add_argument("--host", default="127.0.0.1", help="要对外访问填 0.0.0.0")
     args = parser.parse_args()
 
     seed(args.reset)
@@ -161,8 +162,10 @@ def main() -> None:
 
     import uvicorn
 
-    print(f"\n  打开浏览器： http://127.0.0.1:{args.port}/?token={TOKEN}\n")
-    uvicorn.run("app.main:app", host="127.0.0.1", port=args.port, log_level="warning")
+    shown_host = "127.0.0.1" if args.host in ("0.0.0.0", "::") else args.host
+    print(f"\n  监听 {args.host}:{args.port}")
+    print(f"  打开浏览器： http://{shown_host}:{args.port}/?token={TOKEN}\n")
+    uvicorn.run("app.main:app", host=args.host, port=args.port, log_level="info")
 
 
 if __name__ == "__main__":

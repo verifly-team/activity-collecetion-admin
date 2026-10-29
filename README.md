@@ -12,11 +12,20 @@
 ## 1. 先看效果（不用数据库）
 
 ```bash
-pip install -r requirements.txt
-python -m app.demo
+./run-demo.sh
 ```
 
-浏览器打开 **http://127.0.0.1:8001/?token=demo**
+脚本会自动建虚拟环境、装依赖、造 12 条假数据、启动服务。
+想换端口：`PORT=8020 ./run-demo.sh`；服务器上允许外部访问：`HOST=0.0.0.0 ./run-demo.sh`。
+
+也可以手动来：
+
+```bash
+pip install -r requirements.txt
+python -m app.demo            # --port 8010 --host 127.0.0.1 可改
+```
+
+浏览器打开 **http://127.0.0.1:8010/?token=demo**
 
 会自动造 12 条假报名 + 16 个假附件，直接能看到完整界面。想重造加 `--reset`。
 
@@ -135,7 +144,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 | # | 措施 |
 |---|---|
-| 1 | 独立容器 / 独立域名 / 独立端口 8001 |
+| 1 | 独立容器 / 独立域名 / 独立端口 8010 |
 | 2 | 数据库账号**只有 SELECT**，物理上写不了 |
 | 3 | 附件目录 `-v ...:ro` 只读挂载 |
 | 4 | `--cpus=1 --memory=512m` 资源限额 |
