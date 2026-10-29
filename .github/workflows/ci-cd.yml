@@ -94,7 +94,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: ${{ github.event_name == 'push' || inputs.deploy }}
-    environment: production
+    # GitHub → Settings → Environments 里建的环境名，必须完全一致
+    environment: acr
     steps:
       - uses: actions/checkout@v4
 

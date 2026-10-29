@@ -158,7 +158,11 @@ shred -u /home/deploy/.ssh/id_deploy     # 复制完立刻删掉
 
 ### 5. GitHub Environment（可选但建议）
 
-Settings → Environments → New environment → `production` → 勾 **Required reviewers**。
+Settings → Environments → New environment → 名字填 **`acr`**（必须和 workflow 里的
+`environment: acr` 完全一致）→ 勾 **Required reviewers**，选上你自己。
+
+> 环境名叫什么都可以（production / acr / prod 都行），改 workflow 第 3 个 job 的
+> `environment:` 一行即可，两边必须对上。
 
 这样部署前需要人工点确认，防止误推直接上生产。
 
