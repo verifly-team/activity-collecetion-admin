@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>66th 参展申请 · 导出后台</title>
+<style>
+  :root{
+    --bg:#f6f4f1; --card:#fff; --line:#e7e2db; --line-strong:#d8d1c7;
+    --ink:#1f1c18; --ink-2:#5b544c; --ink-3:#8d857a;
+    --accent:#b0703a; --accent-soft:#f2e6da; --accent-ink:#8a5326;
+    --ok:#2f7a52; --ok-soft:#e4f2ea;
+    --warn:#a8541f; --warn-soft:#fbeade;
+    --danger:#a33232; --danger-soft:#fbe6e6;
+    --r:12px; --r-sm:8px;
+    --shadow:0 1px 2px rgba(31,28,24,.05), 0 8px 24px rgba(31,28,24,.05);
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:var(--font); background:var(--bg); color:var(--ink);
+    font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;font-size:inherit;cursor:pointer}
+  input,select{font-family:inherit;font-size:inherit;color:inherit}
+  a{color:var(--accent-ink)}
+
+  /* ---------- 登录 ---------- */
+  .login-wrap{min-height:100vh;display:grid;place-items:center;padding:24px;
+    background:radial-gradient(1200px 600px at 50% -10%, #efe7dd 0%, var(--bg) 60%)}
+  .login-card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);
+    border-radius:16px;padding:36px 32px;box-shadow:var(--shadow)}
+  .login-card h1{font-size:20px;margin:0 0 6px;letter-spacing:-.01em}
+  .login-card p{margin:0 0 24px;color:var(--ink-3);font-size:13px}
+  .login-card .brand{display:inline-block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);border:1px solid var(--accent-soft);background:var(--accent-soft);
+    padding:3px 9px;border-radius:999px;margin-bottom:16px}
+
+  /* ---------- 布局 ---------- */
+  .topbar{position:sticky;top:0;z-index:30;background:rgba(246,244,241,.9);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .topbar-in{max-width:1400px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:16px}
+  .logo{font-weight:650;font-size:15px;letter-spacing:-.01em}
+  .logo small{display:block;font-weight:400;font-size:11px;color:var(--ink-3);letter-spacing:.06em}
+  .spacer{flex:1}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;
+    font-size:12px;border:1px solid var(--line);background:var(--card);color:var(--ink-2)}
+  .pill.accent{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent-ink)}
+  .wrap{max-width:1400px;margin:0 auto;padding:22px 24px 140px}
+
+  /* ---------- 统计 ---------- */
+  .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:18px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px}
+  .stat .k{font-size:12px;color:var(--ink-3);letter-spacing:.04em}
+  .stat .v{font-size:24px;font-weight:650;letter-spacing:-.02em;margin-top:2px}
+  .stat .v small{font-size:13px;font-weight:400;color:var(--ink-3);margin-left:4px}
+
+  /* ---------- 筛选 ---------- */
+  .filters{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+    padding:14px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+  .field{display:flex;align-items:center;gap:7px}
+  .field label{font-size:12px;color:var(--ink-3);white-space:nowrap}
+  .input,select.input{height:36px;padding:0 11px;border:1px solid var(--line-strong);border-radius:var(--r-sm);
+    background:#fdfcfb;outline:none;transition:.15s}
+  .input:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(176,112,58,.12)}
+  .input::placeholder{color:#b6aea3}
+  .chips{display:flex;gap:6px}
+  .chip{padding:6px 13px;border-radius:999px;border:1px solid var(--line-strong);background:#fdfcfb;
+    font-size:13px;color:var(--ink-2);transition:.15s}
+  .chip:hover{border-color:var(--accent)}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn{height:36px;padding:0 16px;border-radius:var(--r-sm);border:1px solid var(--line-strong);
+    background:#fdfcfb;color:var(--ink);transition:.15s;display:inline-flex;align-items:center;gap:7px}
+  .btn:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:550}
+  .btn.primary:hover{background:var(--accent-ink);border-color:var(--accent-ink);color:#fff}
+  .btn:disabled{opacity:.5;cursor:not-allowed;border-color:var(--line-strong);color:var(--ink-3);
+    background:#f4f1ed}
+  .btn.block{width:100%;justify-content:center;height:44px}
+
+  /* ---------- 表格 ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .table-scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:1080px}
+  thead th{position:sticky;top:0;background:#faf8f5;text-align:left;font-weight:550;color:var(--ink-2);
+    padding:11px 12px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:12px;
+    letter-spacing:.02em}
+  tbody td{padding:11px 12px;border-bottom:1px solid #f1ede7;vertical-align:middle}
+  tbody tr:hover{background:#fdfbf9}
+  tbody tr.sel{background:var(--accent-soft)}
+  tbody tr:last-child td{border-bottom:none}
+  .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  td.nowrap,th.nowrap{white-space:nowrap}
+  .muted{color:var(--ink-3)}
+  .tag{display:inline-block;padding:2px 8px;border-radius:6px;background:#f2eee9;color:var(--ink-2);
+    font-size:12px;margin-right:4px}
+  .tag.zone{background:var(--accent-soft);color:var(--accent-ink)}
+  .tag.none{background:#f4f1ed;color:var(--ink-3)}
+  .cb{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+  .cb:disabled{cursor:not-allowed;opacity:.35}
+  .empty{padding:60px 24px;text-align:center;color:var(--ink-3)}
+  .empty h3{margin:0 0 6px;font-size:15px;color:var(--ink-2)}
+  .loading{padding:48px;text-align:center;color:var(--ink-3)}
+  .spin{width:18px;height:18px;border:2px solid var(--line-strong);border-top-color:var(--accent);
+    border-radius:50%;display:inline-block;animation:sp .7s linear infinite;vertical-align:-3px;margin-right:8px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  /* ---------- 分页 ---------- */
+  .pager{display:flex;align-items:center;gap:10px;justify-content:flex-end;
+    padding:12px 16px;border-top:1px solid var(--line);background:#faf8f5;font-size:13px}
+  .pager .spacer{flex:1}
+
+  /* ---------- 底部操作条 ---------- */
+  .actionbar{position:fixed;left:0;right:0;bottom:0;z-index:40;
+    background:#fff;border-top:1px solid var(--line);
+    box-shadow:0 -8px 24px rgba(31,28,24,.06)}
+  .actionbar-in{max-width:1400px;margin:0 auto;padding:12px 24px;display:flex;align-items:center;gap:16px}
+  .selinfo{font-size:13px;color:var(--ink-2)}
+  .selinfo b{font-size:16px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .selinfo .size{margin-left:10px;color:var(--ink-3)}
+  .selinfo .size b{font-size:13px;color:var(--ink-2)}
+  .warn{color:var(--warn);font-size:12px;margin-left:8px}
+
+  /* ---------- Toast ---------- */
+  #toasts{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:100;
+    display:flex;flex-direction:column;gap:8px;align-items:center}
+  .toast{background:#2a2622;color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;
+    box-shadow:0 8px 28px rgba(0,0,0,.2);animation:in .2s ease}
+  .toast.err{background:var(--danger)}
+  .toast.ok{background:var(--ok)}
+  @keyframes in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+  /* ---------- 打包遮罩 ---------- */
+  .modal{position:fixed;inset:0;background:rgba(31,28,24,.42);z-index:90;display:grid;place-items:center}
+  .modal-card{background:#fff;border-radius:16px;padding:28px 32px;text-align:center;max-width:340px;
+    box-shadow:0 24px 60px rgba(0,0,0,.2)}
+  .modal-card h3{margin:14px 0 6px;font-size:16px}
+  .modal-card p{margin:0;color:var(--ink-3);font-size:13px}
+  .hidden{display:none !important}
+  @media(max-width:860px){
+    .stats{grid-template-columns:1fr}
+    .actionbar-in{flex-wrap:wrap}
+    .wrap{padding:16px 14px 180px}
+    .topbar-in{padding:12px 14px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ 登录 ============ -->
+<div id="loginView" class="login-wrap">
+  <form class="login-card" id="loginForm">
+    <span class="brand">Export Console</span>
+    <h1 id="loginTitle">参展申请导出后台</h1>
+    <p>请输入访问令牌（由管理员提供）</p>
+    <input class="input block" id="tokenInput" type="password" placeholder="Export Token"
+           autocomplete="current-password" style="width:100%;height:44px;margin-bottom:14px">
+    <button class="btn primary block" type="submit" id="loginBtn">进入</button>
+    <p id="loginErr" class="hidden" style="color:var(--danger);margin-top:14px;font-size:13px"></p>
+  </form>
+</div>
+
+<!-- ============ 主界面 ============ -->
+<div id="appView" class="hidden">
+  <div class="topbar">
+    <div class="topbar-in">
+      <div class="logo">66th 参展申请<small>EXPORT CONSOLE</small></div>
+      <div class="spacer"></div>
+      <span class="pill accent" id="limitPill">单次最多 10 条</span>
+      <button class="btn" id="logoutBtn">退出</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="stats">
+      <div class="stat"><div class="k">报名总数</div><div class="v" id="statTotal">–</div></div>
+      <div class="stat"><div class="k">附件数量</div><div class="v" id="statFiles">–</div></div>
+      <div class="stat"><div class="k">附件总体积</div><div class="v" id="statSize">–<small>MB</small></div></div>
+    </div>
+
+    <div class="filters">
+      <div class="field">
+        <label>提交时间</label>
+        <input class="input" type="date" id="fFrom" style="width:150px">
+        <span class="muted">至</span>
+        <input class="input" type="date" id="fTo" style="width:150px">
+      </div>
+      <div class="field">
+        <label>区域</label>
+        <div class="chips" id="zoneChips">
+          <button type="button" class="chip on" data-zone="">全部</button>
+          <button type="button" class="chip" data-zone="A">A 区</button>
+          <button type="button" class="chip" data-zone="B">B 区</button>
+          <button type="button" class="chip" data-zone="C">C 区</button>
+        </div>
+      </div>
+      <div class="field">
+        <input class="input" id="fKeyword" placeholder="品牌 / 联系人 / 手机" style="width:200px">
+      </div>
+      <button class="btn primary" id="searchBtn">查询</button>
+      <button class="btn" id="resetBtn">重置</button>
+    </div>
+
+    <div class="card">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:40px"><input type="checkbox" class="cb" id="checkAll" title="全选本页"></th>
+              <th style="width:64px">ID</th>
+              <th style="width:150px">提交时间</th>
+              <th>品牌 / 店铺</th>
+              <th style="width:100px">联系人</th>
+              <th style="width:130px">手机</th>
+              <th style="width:90px">城市</th>
+              <th style="width:110px">意向区域</th>
+              <th style="width:150px">经营品类</th>
+              <th style="width:80px">带货件数</th>
+              <th style="width:120px">附件</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span class="muted" id="pageInfo">–</span>
+        <div class="spacer"></div>
+        <button class="btn" id="prevBtn" style="height:32px">上一页</button>
+        <button class="btn" id="nextBtn" style="height:32px">下一页</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+    <div class="actionbar-in">
+      <div class="selinfo">
+        已选 <b id="selCount">0</b> / <span id="selLimit">10</span> 条
+        <span class="size">合计 <b id="selSize">0 MB</b></span>
+        <span class="warn hidden" id="limitWarn">已达单次上限，请先取消勾选</span>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn" id="csvBtn" disabled>导出清单 CSV</button>
+      <button class="btn primary" id="zipBtn" disabled>打包下载 ZIP</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<div id="packing" class="modal hidden">
+  <div class="modal-card">
+    <div class="spin" style="width:26px;height:26px;border-width:3px"></div>
+    <h3>正在打包…</h3>
+    <p id="packingTip">文件较大时需要几十秒，请勿关闭页面</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    token: sessionStorage.getItem('export_token') || '',
+    items: [], selected: new Map(),
+    page: 1, pages: 1, total: 0,
+    limit: 10, maxMb: 300,
+    zone: '', keyword: '', from: '', to: '',
+  };
+
+  const fmtMB = (b) => {
+    if (!b) return '0 MB';
+    if (b >= 1024 * 1024 * 1024) return (b / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+    if (b >= 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + ' MB';
+    if (b >= 1024) return (b / 1024).toFixed(0) + ' KB';
+    return b + ' B';
+  };
+  const fmtTime = (iso) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function toast(msg, kind) {
+    const el = document.createElement('div');
+    el.className = 'toast ' + (kind || '');
+    el.textContent = msg;
+    $('toasts').appendChild(el);
+    setTimeout(() => el.remove(), 2800);
+  }
+
+  async function api(path, opts) {
+    opts = opts || {};
+    const res = await fetch(path, {
+      ...opts,
+      headers: { 'Authorization': 'Bearer ' + state.token, ...(opts.headers || {}) },
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = (body.error && body.error.message) || ('HTTP ' + res.status);
+      const err = new Error(msg);
+      err.code = body.error && body.error.code;
+      if (res.status === 401) logout();
+      throw err;
+    }
+    return body;
+  }
+
+  /* ---------------- 登录 ---------------- */
+  async function login(token) {
+    const res = await fetch('/api/v1/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((body.error && body.error.message) || '登录失败');
+    state.token = token;
+    sessionStorage.setItem('export_token', token);
+    if (body.limits) applyLimits(body.limits);
+    if (body.site_title) document.title = body.site_title;
+    showApp();
+  }
+
+  function applyLimits(l) {
+    state.limit = l.max_records ?? state.limit;
+    state.maxMb = l.max_mb ?? state.maxMb;
+    $('limitPill').textContent = `单次最多 ${state.limit} 条 · ${state.maxMb} MB`;
+    $('selLimit').textContent = state.limit;
+  }
+
+  function logout() {
+    state.token = '';
+    sessionStorage.removeItem('export_token');
+    state.selected.clear();
+    $('appView').classList.add('hidden');
+    $('loginView').classList.remove('hidden');
+  }
+
+  function showApp() {
+    $('loginView').classList.add('hidden');
+    $('appView').classList.remove('hidden');
+    loadSummary();
+    loadList();
+  }
+
+  /* ---------------- 数据 ---------------- */
+  async function loadSummary() {
+    try {
+      const s = await api('/api/v1/summary');
+      $('statTotal').textContent = s.applications;
+      $('statFiles').textContent = s.files;
+      $('statSize').innerHTML = fmtMB(s.bytes).replace(/([A-Z]+)$/, '<small>$1</small>');
+      if (s.limits) applyLimits(s.limits);
+    } catch (e) { /* 静默 */ }
+  }
+
+  async function loadList() {
+    $('tbody').innerHTML = '<tr><td colspan="11" class="loading"><span class="spin"></span>加载中…</td></tr>';
+    const q = new URLSearchParams({ page: state.page });
+    if (state.keyword) q.set('keyword', state.keyword);
+    if (state.zone) q.set('zone', state.zone);
+    if (state.from) q.set('date_from', state.from);
+    if (state.to) q.set('date_to', state.to);
+
+    try {
+      const data = await api('/api/v1/applications?' + q.toString());
+      state.items = data.items;
+      state.pages = data.pages;
+      state.total = data.total;
+      renderTable();
+    } catch (e) {
+      $('tbody').innerHTML = `<tr><td colspan="11" class="empty"><h3>加载失败</h3>${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  function renderTable() {
+    const tb = $('tbody');
+    if (!state.items.length) {
+      tb.innerHTML = '<tr><td colspan="11" class="empty"><h3>没有符合条件的报名</h3>换个筛选条件试试</td></tr>';
+    } else {
+      tb.innerHTML = state.items.map((it) => {
+        const zones = (it.zones || []).map((z) => `<span class="tag zone">${esc(z)} 区</span>`).join('');
+        const cats = (it.categories || []).map((c) => `<span class="tag">${esc(catName(c))}</span>`).join('');
+        const files = it.file_count
+          ? `<span class="mono">${it.file_count} 个 · ${fmtMB(it.file_size)}</span>`
+          : '<span class="tag none">无附件</span>';
+        const on = state.selected.has(it.id);
+        return `<tr class="${on ? 'sel' : ''}" data-id="${it.id}">
+          <td><input type="checkbox" class="cb row-cb" data-id="${it.id}" ${on ? 'checked' : ''}></td>
+          <td class="mono muted">${it.id}</td>
+          <td class="mono">${fmtTime(it.created_at)}</td>
+          <td><strong>${esc(it.brand_name)}</strong></td>
+          <td>${esc(it.contact_name || '—')}</td>
+          <td class="mono">${esc(it.phone || '—')}</td>
+          <td>${esc(it.city || '—')}</td>
+          <td>${zones || '—'}</td>
+          <td>${cats || '—'}</td>
+          <td class="mono">${it.expected_qty ?? '—'}</td>
+          <td class="nowrap">${files}</td>
+        </tr>`;
+      }).join('');
+      tb.querySelectorAll('.row-cb').forEach((cb) => {
+        cb.addEventListener('change', () => toggle(Number(cb.dataset.id), cb.checked));
+      });
+    }
+    $('pageInfo').textContent = `第 ${state.page} / ${state.pages} 页 · 共 ${state.total} 条`;
+    $('prevBtn').disabled = state.page <= 1;
+    $('nextBtn').disabled = state.page >= state.pages;
+    syncSelectionUI();
+  }
+
+  const CAT = { bag: '箱包', watch: '腕表', jewelry: '珠宝', apparel: '服饰', shoe: '鞋履', other: '其他' };
+  function catName(c) { return CAT[c] || c; }
+
+  /* ---------------- 选择 ---------------- */
+  function toggle(id, on) {
+    if (on) {
+      if (state.selected.size >= state.limit) {
+        toast(`单次最多选 ${state.limit} 条，请先取消其他勾选`, 'err');
+        syncSelectionUI();
+        return;
+      }
+      const item = state.items.find((x) => x.id === id);
+      if (item) state.selected.set(id, item);
+    } else {
+      state.selected.delete(id);
+    }
+    const row = document.querySelector(`tr[data-id="${id}"]`);
+    if (row) row.classList.toggle('sel', on);
+    syncSelectionUI();
+  }
+
+  function syncSelectionUI() {
+    const n = state.selected.size;
+    let bytes = 0;
+    state.selected.forEach((it) => { bytes += it.file_size || 0; });
+
+    $('selCount').textContent = n;
+    $('selSize').textContent = fmtMB(bytes);
+    $('csvBtn').disabled = n === 0;
+    const tooBig = bytes > state.maxMb * 1024 * 1024;
+    $('zipBtn').disabled = n === 0 || tooBig;
+    $('limitWarn').classList.toggle('hidden', n < state.limit);
+    if (tooBig) toast(`附件合计 ${fmtMB(bytes)} 超过 ${state.maxMb}MB 上限`, 'err');
+
+    const atLimit = n >= state.limit;
+    document.querySelectorAll('.row-cb').forEach((cb) => {
+      const id = Number(cb.dataset.id);
+      cb.disabled = atLimit && !state.selected.has(id);
+    });
+    const all = state.items.length > 0 && state.items.every((it) => state.selected.has(it.id));
+    $('checkAll').checked = all;
+  }
+
+  /* ---------------- 导出 ---------------- */
+  function downloadUrl(path) {
+    const ids = [...state.selected.keys()].join(',');
+    return `${path}?ids=${encodeURIComponent(ids)}&token=${encodeURIComponent(state.token)}`;
+  }
+
+  function triggerDownload(path) {
+    const a = document.createElement('a');
+    a.href = downloadUrl(path);
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 1000);
+  }
+
+  function packing(on) { $('packing').classList.toggle('hidden', !on); }
+
+  /* ---------------- 事件 ---------------- */
+  $('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('loginBtn');
+    btn.disabled = true; btn.textContent = '验证中…';
+    $('loginErr').classList.add('hidden');
+    try {
+      await login($('tokenInput').value.trim());
+    } catch (err) {
+      $('loginErr').textContent = err.message;
+      $('loginErr').classList.remove('hidden');
+    } finally {
+      btn.disabled = false; btn.textContent = '进入';
+    }
+  });
+
+  $('logoutBtn').addEventListener('click', logout);
+
+  $('zoneChips').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    document.querySelectorAll('#zoneChips .chip').forEach((c) => c.classList.remove('on'));
+    chip.classList.add('on');
+    state.zone = chip.dataset.zone;
+    state.page = 1;
+    loadList();
+  });
+
+  $('searchBtn').addEventListener('click', () => {
+    state.keyword = $('fKeyword').value.trim();
+    state.from = $('fFrom').value;
+    state.to = $('fTo').value;
+    state.page = 1;
+    loadList();
+  });
+
+  $('resetBtn').addEventListener('click', () => {
+    $('fKeyword').value = ''; $('fFrom').value = ''; $('fTo').value = '';
+    state.keyword = ''; state.from = ''; state.to = ''; state.zone = '';
+    document.querySelectorAll('#zoneChips .chip').forEach((c, i) => c.classList.toggle('on', i === 0));
+    state.page = 1;
+    loadList();
+  });
+
+  $('fKeyword').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('searchBtn').click(); });
+
+  $('checkAll').addEventListener('change', (e) => {
+    const on = e.target.checked;
+    if (on) {
+      for (const it of state.items) {
+        if (state.selected.size >= state.limit) break;
+        if (!state.selected.has(it.id)) state.selected.set(it.id, it);
+      }
+      if (state.items.length + state.selected.size > state.limit) {
+        toast(`已选满 ${state.limit} 条，其余未勾选`, '');
+      }
+      renderTable();
+    } else {
+      state.items.forEach((it) => state.selected.delete(it.id));
+      renderTable();
+    }
+  });
+
+  $('prevBtn').addEventListener('click', () => { if (state.page > 1) { state.page--; loadList(); } });
+  $('nextBtn').addEventListener('click', () => { if (state.page < state.pages) { state.page++; loadList(); } });
+
+  $('csvBtn').addEventListener('click', () => {
+    triggerDownload('/api/v1/applications.csv');
+    toast('开始下载 CSV', 'ok');
+  });
+
+  $('zipBtn').addEventListener('click', () => {
+    packing(true);
+    triggerDownload('/api/v1/bundle.zip');
+    setTimeout(() => { packing(false); toast('已开始下载，请查看浏览器下载栏', 'ok'); }, 1500);
+  });
+
+  /* ---------------- 启动 ---------------- */
+  // 支持 ?token=xxx 直接进入（方便下发链接），进入后把 token 从地址栏抹掉
+  const urlToken = new URLSearchParams(location.search).get('token');
+  if (urlToken) {
+    login(urlToken)
+      .then(() => history.replaceState(null, '', location.pathname))
+      .catch(() => logout());
+  } else if (state.token) {
+    login(state.token).catch(() => logout());
+  }
+})();
+</script>
+</body>
+</html>
