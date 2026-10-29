@@ -334,3 +334,38 @@ def test_zip_stop_signal_aborts_quickly():
         except StopIteration:
             break
     gen.close()
+
+
+# ---------------------------------------------------------------- 审计日志
+
+
+def test_export_xlsx_writes_audit(client, monkeypatch):
+    from app import main as m
+
+    lines: list[str] = []
+
+    class _Fake:
+        def info(self, msg, *a):
+            lines.append(msg % a if a else msg)
+
+    monkeypatch.setattr(m, "logger", _Fake())
+    client.get("/api/v1/applications.xlsx?ids=1,2", headers=AUTH)
+    hit = [x for x in lines if "event=export_xlsx" in x]
+    assert hit, f"没有导出审计：{lines}"
+    assert "count=2" in hit[0]
+    assert "ids=1,2" in hit[0]
+    assert "ip=" in hit[0]
+
+
+def test_reveal_phone_writes_audit(client, monkeypatch):
+    from app import main as m
+
+    lines: list[str] = []
+
+    class _Fake:
+        def info(self, msg, *a):
+            lines.append(msg % a if a else msg)
+
+    monkeypatch.setattr(m, "logger", _Fake())
+    client.get("/api/v1/applications/1/phone", headers=AUTH)
+    assert any("event=reveal_phone" in x and "application_id=1" in x for x in lines), lines

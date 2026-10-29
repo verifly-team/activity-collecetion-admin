@@ -236,7 +236,38 @@ python -m uvicorn app.main:app --port 8010
 
 ---
 
-## 10. 设计语言
+## 10. 审计日志
+
+所有敏感操作都会写一行结构化日志到 stdout，`docker logs` 直接可查：
+
+```bash
+docker logs verifly-export 2>&1 | grep AUDIT
+```
+
+| event | 何时触发 | 记录内容 |
+|---|---|---|
+| `reveal_phone` | 点眼睛看完整手机号 | 报名 ID、IP、UA |
+| `export_xlsx` | 导出 Excel | 报名 ID 列表、条数、附件数、IP、UA |
+| `export_zip` | 开始打包 | 报名 ID 列表、条数、附件数、合计 MB、IP、UA |
+| `export_zip_done` | 打包结束/中断 | 实际发出字节数、MB、`aborted=1` 表示没下完 |
+
+样例：
+
+```
+2026-10-29 15:09:41 AUDIT event=export_xlsx ip=10.0.0.9 ua=Mozilla/5.0 ids=1,2,3 count=3 files=6
+2026-10-29 15:09:42 AUDIT event=export_zip ip=10.0.0.9 ua=Mozilla/5.0 ids=1,2 count=2 files=5 mb=22.1
+2026-10-29 15:09:44 AUDIT event=export_zip_done ip=10.0.0.9 ua=Mozilla/5.0 bytes=5777870 mb=5.5 aborted=1
+2026-10-29 15:09:45 AUDIT event=reveal_phone ip=10.0.0.9 ua=Mozilla/5.0 application_id=1
+```
+
+`aborted=1` 说明这次打包没下载完（用户中途关页面或网络断了），
+结合 `mb` 能看出流出去了多少。
+
+> 审计只写日志文件，**不写数据库** —— 导出服务的数据库账号是只读的，物理上写不进去。
+
+---
+
+## 11. 设计语言
 
 与 `activity-66-portal/src/apply.css` 共用同一套变量：
 
@@ -253,11 +284,11 @@ python -m uvicorn app.main:app --port 8010
 
 约定：**圆角 0**、输入框只用下边框、按钮实心墨黑、小标签大写 + `.18em` 字距。
 
-## 11. 开发
+## 12. 开发
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -q                 # 21 个用例
+pytest -q                 # 23 个用例
 ruff check app tests
 ruff format --check app tests
 python -m app.demo        # 本地预览

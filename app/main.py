@@ -31,6 +31,18 @@ if not logger.handlers:  # 保证审计日志一定落到 stdout（docker logs �
     logger.setLevel(logging.INFO)
     logger.propagate = False
 
+
+def _audit(event: str, request: Request | None = None, **fields: Any) -> None:
+    """统一审计格式，一条一行，docker logs / 日志文件都能直接 grep。"""
+    parts = [f"event={event}"]
+    if request is not None:
+        parts.append(f"ip={client_ip(request)}")
+        ua = (request.headers.get("user-agent") or "").replace(" ", "_")[:80]
+        parts.append(f"ua={ua}")
+    parts.extend(f"{k}={v}" for k, v in fields.items())
+    logger.info(" ".join(parts))
+
+
 DESCRIPTION = """
 66th & 2nd 市集 —— **参展申请列表**。
 
@@ -53,7 +65,7 @@ _DOCS = {
 
 app = FastAPI(
     title="66th 参展申请导出服务",
-    version="1.3.1",
+    version="1.3.2",
     description=DESCRIPTION,
     lifespan=lifespan,
     **_DOCS,
@@ -243,12 +255,7 @@ def reveal_phone(application_id: int, request: Request) -> dict:
     phone = db.get_phone(application_id)
     if phone is None:
         raise HTTPException(status_code=404, detail="报名记录不存在")
-    logger.info(
-        "reveal_phone application_id=%s ip=%s ua=%s",
-        application_id,
-        client_ip(request),
-        (request.headers.get("user-agent") or "")[:80],
-    )
+    _audit("reveal_phone", request, application_id=application_id)
     return {"ok": True, "application_id": application_id, "phone": phone}
 
 
@@ -258,8 +265,15 @@ def reveal_phone(application_id: int, request: Request) -> dict:
     summary="导出 Excel（报名清单 / 代表商品 / 附件清单 三个 sheet）",
     dependencies=[Depends(require_token), Depends(guard_export)],
 )
-def export_excel(ids: str = Query(..., description="逗号分隔的报名 id")) -> Response:
+def export_excel(request: Request, ids: str = Query(..., description="逗号分隔的报名 id")) -> Response:
     rows, files_map = _load(_parse_ids(ids))
+    _audit(
+        "export_xlsx",
+        request,
+        ids=",".join(str(r["id"]) for r in rows),
+        count=len(rows),
+        files=sum(len(v) for v in files_map.values()),
+    )
     return Response(
         content=build_workbook(rows, files_map, settings.upload_path),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -283,6 +297,14 @@ def export_bundle(
             status_code=429,
             detail=f"当前已有 {settings.max_concurrent_exports} 个打包任务在进行，请稍后再试",
         )
+    _audit(
+        "export_zip",
+        request,
+        ids=",".join(str(r["id"]) for r in rows),
+        count=len(rows),
+        files=sum(len(v) for v in files_map.values()),
+        mb=f"{sum(int(r.get('file_size') or 0) for r in rows) / 1024 / 1024:.1f}",
+    )
     filename = quote(zip_filename())
     return StreamingResponse(
         _gated_zip(request, rows, files_map, lease),
@@ -319,19 +341,32 @@ async def _gated_zip(request: Request, rows: list[dict], files_map: dict, lease:
             raise
 
     task = asyncio.create_task(watch())
+    sent = 0
+    aborted = False
     try:
         while True:
             chunk = await asyncio.to_thread(next, gen, _STOP)
             if chunk is _STOP:
                 break
             _export_gate.touch(lease)
+            sent += len(chunk)
             yield chunk
+    except (asyncio.CancelledError, GeneratorExit):
+        aborted = True
+        raise
     finally:
         task.cancel()
         stop.set()
         with contextlib.suppress(Exception):
             gen.close()
         _export_gate.release(lease)
+        _audit(
+            "export_zip_done",
+            request,
+            bytes=sent,
+            mb=f"{sent / 1024 / 1024:.1f}",
+            aborted=int(aborted),
+        )
 
 
 if settings.static_path.is_dir() and (settings.static_path / "index.html").exists():
