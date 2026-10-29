@@ -1,6 +1,6 @@
 # activity-66-export
 
-66th & 2nd 市集 —— **参展申请导出后台**（只读，独立服务）。
+66th & 2nd 市集 —— **参展申请列表**（只读，独立服务）。
 
 勾选 → 导出 **Excel**（三个 sheet）/ 打包下载 **ZIP**（Excel + 商家上传的原附件）。
 **不写库、不动文件**，和采集服务完全隔离。
@@ -124,7 +124,7 @@ docker compose up -d --build      # 或 docker run，见 docs/DEPLOY.md
 | `MAX_EXPORT_MB` | `300` | 单次附件合计上限 |
 | `PAGE_SIZE` | `20` | 每页条数 |
 | `MAX_PAGE_SIZE` | `100` | 接口允许的最大 page_size |
-| `SITE_TITLE` | `66th 参展申请 · 导出后台` | 页面标题 |
+| `SITE_TITLE` | `参展申请列表｜66th & 2nd Ave.` | 页面标题 |
 | `ALLOWED_ORIGINS` | `*` | 跨域白名单 |
 
 改完重启容器生效，不用重新构建。

@@ -148,7 +148,7 @@ def seed(reset: bool) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="导出后台 DEMO")
+    parser = argparse.ArgumentParser(description="参展申请列表 DEMO")
     parser.add_argument("--reset", action="store_true", help="清掉旧数据重新生成")
     parser.add_argument("--port", type=int, default=8010)
     parser.add_argument("--host", default="127.0.0.1", help="要对外访问填 0.0.0.0")

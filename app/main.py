@@ -1,4 +1,4 @@
-"""66th 参展申请 —— 导出后台（只读，独立服务）。"""
+"""66th 参展申请 —— 参展申请列表（只读，独立服务）。"""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from .excel import build_workbook, excel_filename, zip_filename
 from .export import iter_zip
 
 DESCRIPTION = """
-66th & 2nd 市集 —— **参展申请导出后台**。
+66th & 2nd 市集 —— **参展申请列表**。
 
 - 只读访问采集服务的数据库与附件目录，不会写入任何数据
 - 页面上筛选、勾选、导出清单（CSV）或打包下载（ZIP）

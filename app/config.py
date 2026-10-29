@@ -28,7 +28,7 @@ class Settings:
         self.max_page_size = int(os.getenv("MAX_PAGE_SIZE", "100"))
 
         # ---- 展示 ----
-        self.title = os.getenv("SITE_TITLE", "66th 参展申请 · 导出后台")
+        self.title = os.getenv("SITE_TITLE", "参展申请列表｜66th & 2nd Ave.")
         self.event_name = os.getenv("EVENT_NAME", "66th & 2nd Vintage Fashion Show & Market")
         self.allow_origins = _env_list("ALLOWED_ORIGINS", "*") or ["*"]
         self.static_dir = os.getenv("STATIC_DIR", "static")
