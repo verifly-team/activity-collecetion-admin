@@ -98,6 +98,12 @@
   .tag.zone{background:var(--accent-soft);color:var(--accent-ink)}
   .tag.none{background:#f4f1ed;color:var(--ink-3)}
   .cb{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+  .phone-cell{white-space:nowrap}
+  .phone-cell .eye{margin-left:6px;padding:1px 7px;font-size:11px;line-height:1.6;
+    border:1px solid var(--line-strong);border-radius:6px;background:#fdfcfb;color:var(--ink-3);
+    cursor:pointer;vertical-align:1px;transition:.15s}
+  .phone-cell .eye:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .phone-cell.revealed .phone-text{color:var(--accent-ink);font-weight:600}
   .cb:disabled{cursor:not-allowed;opacity:.35}
   .empty{padding:60px 24px;text-align:center;color:var(--ink-3)}
   .empty h3{margin:0 0 6px;font-size:15px;color:var(--ink-2)}
@@ -282,6 +288,15 @@
     const p = (n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
   };
+  // 手机号脱敏：138****8000
+  const maskPhone = (p) => {
+    const v = String(p || '');
+    if (!v) return '—';
+    if (v.length >= 11) return v.slice(0, 3) + '****' + v.slice(-4);
+    if (v.length >= 7) return v.slice(0, 2) + '****' + v.slice(-2);
+    return v.slice(0, 1) + '***';
+  };
+
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -396,7 +411,10 @@
           <td class="mono">${fmtTime(it.created_at)}</td>
           <td><strong>${esc(it.brand_name)}</strong></td>
           <td>${esc(it.contact_name || '—')}</td>
-          <td class="mono">${esc(it.phone || '—')}</td>
+          <td class="mono phone-cell" data-phone="${esc(it.phone || '')}">
+            <span class="phone-text">${esc(maskPhone(it.phone))}</span>
+            ${it.phone ? '<button type="button" class="eye">显示</button>' : ''}
+          </td>
           <td>${esc(it.city || '—')}</td>
           <td>${zones || '—'}</td>
           <td>${cats || '—'}</td>
@@ -406,6 +424,18 @@
       }).join('');
       tb.querySelectorAll('.row-cb').forEach((cb) => {
         cb.addEventListener('change', () => toggle(Number(cb.dataset.id), cb.checked));
+      });
+      tb.querySelectorAll('.eye').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const cell = btn.closest('.phone-cell');
+          const text = cell.querySelector('.phone-text');
+          const full = cell.dataset.phone;
+          const shown = btn.dataset.shown === '1';
+          text.textContent = shown ? maskPhone(full) : full;
+          btn.dataset.shown = shown ? '0' : '1';
+          btn.textContent = shown ? '显示' : '隐藏';
+          cell.classList.toggle('revealed', !shown);
+        });
       });
     }
     $('pageInfo').textContent = `第 ${state.page} / ${state.pages} 页 · 共 ${state.total} 条`;
