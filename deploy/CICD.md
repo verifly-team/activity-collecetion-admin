@@ -78,6 +78,8 @@ chown -R 10001:10001 /verifly/activity/uploads
 chmod 700 /verifly/activity-export
 
 # ④ 配置文件（内容见 deploy/RUNBOOK.md 第 2.4 节）
+# 从仓库拷一份模板过去，改两个值即可
+cp deploy/export.env.example /verifly/activity-export/export.env
 vi /verifly/activity-export/export.env && chmod 600 /verifly/activity-export/export.env
 
 # ⑤ 把 CI 的公钥装进 deploy 用户（密钥在本机生成，见下方「SSH 密钥怎么来」）
