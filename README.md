@@ -28,6 +28,9 @@
 完整流程（数据库准备 → 构建推送 → 部署验收 → 日常运维 → 回滚）见
 **[deploy/RUNBOOK.md](deploy/RUNBOOK.md)**。
 
+自动化发布（GitHub Actions → 阿里云）见 **[deploy/CICD.md](deploy/CICD.md)**：
+推 `main` 自动测试 → 构建镜像 → 推 ACR → SSH 部署 → 健康检查失败自动回滚。
+
 审计日志查询：`./deploy/audit.sh`（`summary` / `zip` / `xlsx` / `phone` / `aborted` / `ids 12` / `today`）。
 
 ---
