@@ -1,7 +1,7 @@
 """一键 DEMO：造一批假数据 + 起服务，用来预览界面。
 
-    python -m app.demo            # 造数据并启动，浏览器打开 http://127.0.0.1:8001/?token=demo
-    python -m app.demo --reset    # 清掉旧数据重造
+python -m app.demo            # 造数据并启动，浏览器打开 http://127.0.0.1:8001/?token=demo
+python -m app.demo --reset    # 清掉旧数据重造
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import os
 import random
 import shutil
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 DEMO_DIR = Path("demo")
@@ -77,10 +77,10 @@ def seed(reset: bool) -> None:
 
     conn = sqlite3.connect(DB_PATH)
     conn.executescript(SCHEMA)
-    base = datetime.now(timezone.utc) - timedelta(days=2)
+    base = datetime.now(UTC) - timedelta(days=2)
 
     for idx, (brand, contact, city, cats, zones) in enumerate(BRANDS, start=1):
-        created = (base + timedelta(hours=idx * 3, minutes=random.randint(0, 59)))
+        created = base + timedelta(hours=idx * 3, minutes=random.randint(0, 59))
         created_iso = created.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         item = random.choice(ITEMS)
         conn.execute(
@@ -110,9 +110,14 @@ def seed(reset: bool) -> None:
                 random.choice([0, 10]),
                 0,
                 json.dumps(
-                    [{"name": item[0], "era_series": item[1],
-                      "condition_source": "二手 / 附来源说明",
-                      "price": random.randint(3000, 60000)}],
+                    [
+                        {
+                            "name": item[0],
+                            "era_series": item[1],
+                            "condition_source": "二手 / 附来源说明",
+                            "price": random.randint(3000, 60000),
+                        }
+                    ],
                     ensure_ascii=False,
                 ),
                 created_iso,
@@ -134,8 +139,7 @@ def seed(reset: bool) -> None:
             conn.execute(
                 "INSERT INTO file (id, application_id, kind, original_name, stored_path,"
                 " mime, size, sha256, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
-                (fid, idx, "photos", name, f"{idx}/{fid}.zip",
-                 "application/zip", size, "", created_iso),
+                (fid, idx, "photos", name, f"{idx}/{fid}.zip", "application/zip", size, "", created_iso),
             )
 
     conn.commit()
