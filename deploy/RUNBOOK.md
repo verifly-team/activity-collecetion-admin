@@ -121,6 +121,24 @@ chmod 600 /opt/verifly/export.env
 head -c 30 /dev/urandom | base64 | tr -d '/+=' | head -c 40   # 生成 token
 ```
 
+### 2.4.1 CI 部署密钥（仅用 GitHub Actions 时需要）
+
+```bash
+# 本机生成专用密钥（私钥只放 GitHub Secrets，不落服务器）
+ssh-keygen -t ed25519 -N "" -C "github-actions@verifly" -f ~/.ssh/id_deploy_gh
+
+# 公钥装到服务器
+ssh-copy-id -i ~/.ssh/id_deploy_gh.pub deploy@<服务器IP>
+
+# 验证
+ssh -i ~/.ssh/id_deploy_gh deploy@<服务器IP> 'docker ps && echo OK'
+
+# 私钥全文 → GitHub Secret: SSH_PRIVATE_KEY
+pbcopy < ~/.ssh/id_deploy_gh
+```
+
+详见 [CICD.md](CICD.md)。
+
 ### 2.5 构建并推送镜像
 
 ```bash

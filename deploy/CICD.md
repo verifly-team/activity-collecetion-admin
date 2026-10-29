@@ -80,12 +80,61 @@ chmod 700 /opt/verifly/export
 # ④ 配置文件（内容见 deploy/RUNBOOK.md 第 2.4 节）
 vi /opt/verifly/export.env && chmod 600 /opt/verifly/export.env
 
-# ⑤ 生成部署密钥（在服务器上用 deploy 用户执行）
+# ⑤ 把 CI 的公钥装进 deploy 用户（密钥在本机生成，见下方「SSH 密钥怎么来」）
+#    这一步在服务器上执行：
+mkdir -p /home/deploy/.ssh && chmod 700 /home/deploy/.ssh
+echo '<本机 id_deploy.pub 的内容>' >> /home/deploy/.ssh/authorized_keys
+chmod 600 /home/deploy/.ssh/authorized_keys
+chown -R deploy:deploy /home/deploy/.ssh
+```
+
+#### SSH 密钥怎么来
+
+**推荐：在本机生成，把公钥装到服务器，私钥只放 GitHub Secrets。**
+私钥永远不落在服务器上。
+
+```bash
+# ① 本机（Mac / 你的电脑）生成，专门给 CI 用，不要复用个人密钥
+ssh-keygen -t ed25519 -N "" -C "github-actions@verifly" -f ~/.ssh/id_deploy_gh
+
+# ② 把公钥装到服务器
+ssh-copy-id -i ~/.ssh/id_deploy_gh.pub deploy@<服务器IP>
+#    或者手动：cat ~/.ssh/id_deploy_gh.pub 后粘贴进服务器 authorized_keys
+
+# ③ 先验证能连上，再去配 GitHub
+ssh -i ~/.ssh/id_deploy_gh deploy@<服务器IP> 'docker ps && echo OK'
+
+# ④ 复制私钥全文 → GitHub Secrets 的 SSH_PRIVATE_KEY
+#    macOS：
+pbcopy < ~/.ssh/id_deploy_gh
+#    Linux：
+xclip -sel clip < ~/.ssh/id_deploy_gh
+#    Windows：记事本打开 %USERPROFILE%\.ssh\id_deploy_gh，Ctrl+A 全选复制
+```
+
+**粘贴注意事项（踩坑重灾区）：**
+
+| 要点 | 说明 |
+|---|---|
+| 必须包含首尾两行 | `-----BEGIN OPENSSH PRIVATE KEY-----` 和 `-----END OPENSSH PRIVATE KEY-----` |
+| 不要加引号 | 粘 raw 文本，不要 `"..."` |
+| 结尾要有换行 | 少了最后一行换行，SSH 会报 `invalid format` |
+| 别用 `cat -A` 复制 | 会带 `$` 等不可见字符 |
+
+**可选加固**：在服务器 `authorized_keys` 里给这个 key 加前缀，
+禁掉端口转发等非必要能力：
+
+```
+restrict ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... github-actions@verifly
+```
+
+**应急方案**：如果手上没有方便操作的电脑，也可以在服务器上生成再删私钥：
+
+```bash
 sudo -u deploy ssh-keygen -t ed25519 -N "" -f /home/deploy/.ssh/id_deploy
 cat /home/deploy/.ssh/id_deploy.pub >> /home/deploy/.ssh/authorized_keys
-chmod 600 /home/deploy/.ssh/authorized_keys
-# 私钥内容待会要贴到 GitHub Secrets
-cat /home/deploy/.ssh/id_deploy
+cat /home/deploy/.ssh/id_deploy          # 复制内容到 GitHub Secrets
+shred -u /home/deploy/.ssh/id_deploy     # 复制完立刻删掉
 ```
 
 ### 4. GitHub Secrets（仓库 → Settings → Secrets and variables → Actions）
