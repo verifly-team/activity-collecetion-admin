@@ -8,6 +8,13 @@
 界面风格与线上报名页 [`activity-66-portal`](../../activity-66-portal) 的 `apply.html` 保持一致：
 零圆角、墨黑主色、鼠尾草绿悬停、下划线输入框、大写加宽字距的标签。
 
+品牌资产直接从报名页搬过来，保证同一套视觉：
+
+| 文件 | 来源 | 用途 |
+|---|---|---|
+| `static/brand.png` | `activity-66-portal/src/assets/optimized/brand.png` | 顶栏 / 登录页 logo |
+| `static/favicon.png` | `activity-66-portal/public/favicon.png` | 浏览器标签页图标 |
+
 ![登录](docs/screenshot-login.png)
 ![主界面](docs/screenshot-main.png)
 ![手机号展开](docs/screenshot-phone.png)
