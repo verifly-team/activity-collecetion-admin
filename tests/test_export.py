@@ -381,3 +381,35 @@ def test_audit_api(client):
     assert all(i["event"] == "export_xlsx" for i in only["items"])
     # 需要 token
     assert client.get("/api/v1/audit").status_code == 401
+
+
+def test_token_can_be_any_length(client, monkeypatch):
+    """token 没有长度限制：短的、长的都能用。"""
+    from app import auth
+
+    for token in ("x", "short123", "a" * 200):
+        monkeypatch.setattr(auth.settings, "export_token", token, raising=False)
+        auth._failed.clear()
+        assert client.get("/api/v1/summary", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+        auth._failed.clear()
+        assert client.get("/api/v1/summary", headers={"Authorization": "Bearer wrong"}).status_code == 401
+        auth._failed.clear()
+
+
+def test_token_with_non_ascii_does_not_crash(client, monkeypatch):
+    """token 含中文时走 ?token= 应该是 401 而不是 500（compare_digest 的 ASCII 限制）。
+
+    注：HTTP 请求头只能放 ASCII，所以中文 token 只能通过 query 传。
+    """
+    from app import auth
+
+    monkeypatch.setattr(auth.settings, "export_token", "密钥中文", raising=False)
+
+    auth._failed.clear()
+    ok = client.get("/api/v1/summary", params={"token": "密钥中文"})
+    auth._failed.clear()
+    bad = client.get("/api/v1/summary", params={"token": "密钥中"})
+    auth._failed.clear()
+
+    assert ok.status_code == 200
+    assert bad.status_code == 401

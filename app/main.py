@@ -52,6 +52,13 @@ DESCRIPTION = """
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    if not settings.export_token:
+        logger.warning("未配置 EXPORT_TOKEN，导出接口会返回 503")
+    elif len(settings.export_token) < 16:
+        logger.warning(
+            "EXPORT_TOKEN 只有 %d 位，建议至少 32 位随机串（openssl rand -base64 32）",
+            len(settings.export_token),
+        )
     yield
 
 

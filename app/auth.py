@@ -51,7 +51,11 @@ def _expected() -> str:
 def verify(supplied: str | None, ip: str) -> None:
     token = _expected()
     _check_blocked(ip)
-    if not supplied or not hmac.compare_digest(supplied, token):
+    # 按字节比较：hmac.compare_digest 传 str 只支持 ASCII，
+    # 一旦 token 里有中文/emoji 会抛 TypeError 变成 500。
+    # 编码成 UTF-8 后再比，既支持任意字符又保持常数时间。
+    ok = bool(supplied) and hmac.compare_digest((supplied or "").encode("utf-8"), token.encode("utf-8"))
+    if not ok:
         register_failure(ip)
         raise HTTPException(status_code=401, detail="Token 不正确")
     register_success(ip)
