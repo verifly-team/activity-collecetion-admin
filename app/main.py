@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import quote
@@ -17,6 +18,7 @@ from .auth import client_ip, require_token, verify
 from .config import settings
 from .excel import build_workbook, excel_filename, zip_filename
 from .export import iter_zip
+from .limits import ConcurrencyGate, RateLimiter
 
 logger = logging.getLogger("export.audit")
 if not logger.handlers:  # 保证审计日志一定落到 stdout（docker logs 可见）
@@ -40,11 +42,18 @@ async def lifespan(_: FastAPI):
     yield
 
 
+_DOCS = {
+    "docs_url": "/docs" if settings.enable_docs else None,
+    "redoc_url": "/redoc" if settings.enable_docs else None,
+    "openapi_url": "/openapi.json" if settings.enable_docs else None,
+}
+
 app = FastAPI(
     title="66th 参展申请导出服务",
-    version="1.1.0",
+    version="1.3.0",
     description=DESCRIPTION,
     lifespan=lifespan,
+    **_DOCS,
 )
 
 app.add_middleware(
@@ -53,6 +62,59 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; "
+    "connect-src 'self'; "
+    "form-action 'self'; "
+    "frame-ancestors 'none'; "
+    "base-uri 'none'; "
+    "object-src 'none'"
+)
+
+
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    response = await call_next(request)
+    headers = response.headers
+    headers["X-Content-Type-Options"] = "nosniff"
+    headers["X-Frame-Options"] = "DENY"
+    headers["Referrer-Policy"] = "no-referrer"  # 防止 token/URL 经 Referer 外泄
+    headers["Content-Security-Policy"] = _CSP
+    headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    if request.url.path.startswith("/api/"):
+        headers["Cache-Control"] = "no-store"
+    return response
+
+
+class _RedactToken(logging.Filter):
+    """把访问日志里的 token=xxx 打码，避免密钥落到日志里。"""
+
+    _PATTERN = re.compile(r"(token=)[^&\s\"]+")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple):
+            record.args = tuple(self._PATTERN.sub(r"\1***", a) if isinstance(a, str) else a for a in args)
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_RedactToken())
+
+# ---- 导出限流 / 并发闸门 ----
+_export_limiter = RateLimiter(settings.export_per_min, 60.0)
+_export_gate = ConcurrencyGate(settings.max_concurrent_exports)
+
+
+def guard_export(request: Request) -> None:
+    """导出接口限流：每 IP 每分钟 N 次。"""
+    ok, wait = _export_limiter.allow(client_ip(request))
+    if not ok:
+        raise HTTPException(status_code=429, detail=f"导出过于频繁，请 {wait} 秒后再试")
 
 
 def _error(status: int, code: str, message: str) -> JSONResponse:
@@ -191,7 +253,7 @@ def reveal_phone(application_id: int, request: Request) -> dict:
     "/api/v1/applications.xlsx",
     tags=["导出"],
     summary="导出 Excel（报名清单 / 代表商品 / 附件清单 三个 sheet）",
-    dependencies=[Depends(require_token)],
+    dependencies=[Depends(require_token), Depends(guard_export)],
 )
 def export_excel(ids: str = Query(..., description="逗号分隔的报名 id")) -> Response:
     rows, files_map = _load(_parse_ids(ids))
@@ -206,13 +268,18 @@ def export_excel(ids: str = Query(..., description="逗号分隔的报名 id")) 
     "/api/v1/bundle.zip",
     tags=["导出"],
     summary="打包下载 ZIP（Excel + 附件原件）",
-    dependencies=[Depends(require_token)],
+    dependencies=[Depends(require_token), Depends(guard_export)],
 )
 def export_bundle(ids: str = Query(..., description="逗号分隔的报名 id")) -> StreamingResponse:
     rows, files_map = _load(_parse_ids(ids))
+    if not _export_gate.acquire():
+        raise HTTPException(
+            status_code=429,
+            detail=f"当前已有 {settings.max_concurrent_exports} 个打包任务在进行，请稍后再试",
+        )
     filename = quote(zip_filename())
     return StreamingResponse(
-        iter_zip(rows, files_map, settings.upload_path),
+        _gated_zip(rows, files_map),
         media_type="application/zip",
         headers={
             "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
@@ -221,10 +288,18 @@ def export_bundle(ids: str = Query(..., description="逗号分隔的报名 id"))
     )
 
 
+def _gated_zip(rows: list[dict], files_map: dict) -> Any:
+    """打包结束（成功/失败/中断）都要归还并发名额。"""
+    try:
+        yield from iter_zip(rows, files_map, settings.upload_path)
+    finally:
+        _export_gate.release()
+
+
 if settings.static_path.is_dir() and (settings.static_path / "index.html").exists():
     app.mount("/", StaticFiles(directory=settings.static_path, html=True), name="static")
 else:
 
     @app.get("/", tags=["系统"])
     def index() -> dict:
-        return {"service": "66th 参展申请导出服务", "docs": "/docs"}
+        return {"service": "66th 参展申请导出服务", "ok": True}

@@ -204,3 +204,65 @@ def test_export_still_has_full_phone(client):
     wb = load_workbook(BytesIO(res.content))
     ws = wb["报名清单"]
     assert ws.cell(row=2, column=5).value == "13800138000"
+
+
+# ---------------------------------------------------------------- 安全回归
+
+
+def test_security_headers(client):
+    res = client.get("/healthz")
+    assert res.headers["x-content-type-options"] == "nosniff"
+    assert res.headers["x-frame-options"] == "DENY"
+    assert res.headers["referrer-policy"] == "no-referrer"
+    assert "default-src 'self'" in res.headers["content-security-policy"]
+    api = client.get("/api/v1/summary", headers=AUTH)
+    assert api.headers["cache-control"] == "no-store"
+
+
+def test_docs_off_by_default(client):
+    """/docs、/openapi.json 默认不暴露。"""
+    assert client.get("/docs").status_code == 404
+    assert client.get("/openapi.json").status_code == 404
+
+
+def test_excel_formula_injection_neutralised():
+    """商家把 =cmd|... 填进品牌名，导出时必须当纯文本存。"""
+    from app.excel import build_workbook
+    from openpyxl import load_workbook
+
+    row = {
+        "id": 1,
+        "created_at": "2026-10-29T10:00:00Z",
+        "brand_name": "=cmd|' /C calc'!A0",
+        "contact_name": "+触类旁通",
+        "phone": "13800138000",
+        "wechat": "@SUM(1)",
+        "email": "",
+        "city": "",
+        "entity_type": "company",
+        "is_first_time": 0,
+        "categories": "[]",
+        "zones": "[]",
+        "expected_qty": 1,
+        "items_json": "[]",
+    }
+    from pathlib import Path
+
+    wb = load_workbook(io.BytesIO(build_workbook([row], {}, Path("/tmp"))))
+    ws = wb["报名清单"]
+    brand = ws.cell(row=2, column=3)
+    assert brand.value == "=cmd|' /C calc'!A0"
+    assert brand.data_type == "s", "公式型单元格会被 Excel 执行"
+    assert ws.cell(row=2, column=4).data_type == "s"
+
+
+def test_export_rate_limited(client, monkeypatch):
+    from app import main as m
+
+    monkeypatch.setattr(m._export_limiter, "times", 2)
+    m._export_limiter._hits.clear()
+    ok1 = client.get("/api/v1/applications.xlsx?ids=1", headers=AUTH)
+    ok2 = client.get("/api/v1/applications.xlsx?ids=1", headers=AUTH)
+    bad = client.get("/api/v1/applications.xlsx?ids=1", headers=AUTH)
+    assert ok1.status_code == 200 and ok2.status_code == 200
+    assert bad.status_code == 429

@@ -843,6 +843,10 @@
   // 支持 ?token=xxx 直接进入（方便下发链接），进入后把 token 从地址栏抹掉
   const urlToken = new URLSearchParams(location.search).get('token');
   if (urlToken) {
+    // 立刻从地址栏和历史记录里抹掉 token，避免被截图/分享/Referer 带出去
+    history.replaceState(null, '', location.pathname);
+  }
+  if (urlToken) {
     login(urlToken)
       .then(() => history.replaceState(null, '', location.pathname))
       .catch(() => logout());

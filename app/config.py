@@ -23,6 +23,8 @@ class Settings:
 
         # ---- 导出限制（可按需调）----
         self.max_records = int(os.getenv("MAX_EXPORT_RECORDS", "10"))
+        self.export_per_min = int(os.getenv("EXPORT_PER_MIN", "30"))
+        self.max_concurrent_exports = int(os.getenv("MAX_CONCURRENT_EXPORTS", "2"))
         self.max_bundle_mb = int(os.getenv("MAX_EXPORT_MB", "300"))
         self.page_size = int(os.getenv("PAGE_SIZE", "20"))
         self.max_page_size = int(os.getenv("MAX_PAGE_SIZE", "100"))
@@ -32,6 +34,8 @@ class Settings:
         self.event_name = os.getenv("EVENT_NAME", "66th & 2nd Vintage Fashion Show & Market")
         self.allow_origins = _env_list("ALLOWED_ORIGINS", "*") or ["*"]
         self.static_dir = os.getenv("STATIC_DIR", "static")
+        # /docs、/redoc、/openapi.json 是否公开；生产建议关闭
+        self.enable_docs = os.getenv("ENABLE_DOCS", "0").lower() in ("1", "true", "yes")
 
     @property
     def max_bundle_bytes(self) -> int:

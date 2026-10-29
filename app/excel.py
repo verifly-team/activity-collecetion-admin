@@ -11,6 +11,9 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 ACCENT = "B0703A"
+
+# Excel 会把以这些字符开头的单元格当公式执行（CSV/Excel 注入）
+_FORMULA_PREFIX = ("=", "+", "-", "@", "\t", "\r")
 ACCENT_SOFT = "F7EFE7"
 BORDER_COLOR = "E0D9D0"
 
@@ -50,6 +53,9 @@ def _write_sheet(
     for r_idx, row in enumerate(rows, start=2):
         for c_idx, value in enumerate(row, start=1):
             cell = ws.cell(row=r_idx, column=c_idx, value=value)
+            # 防公式注入：以 = + - @ 开头的文本强制按字符串存，Excel 不会当公式执行
+            if isinstance(value, str) and value[:1] in _FORMULA_PREFIX:
+                cell.data_type = "s"
             cell.border = _thin()
             cell.alignment = Alignment(vertical="top", wrap_text=False)
             if r_idx % 2 == 0:

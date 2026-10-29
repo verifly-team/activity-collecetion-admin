@@ -6,7 +6,7 @@
 set -euo pipefail
 
 ENV_FILE="${1:-.env}"
-IMAGE="${IMAGE:-crpi-quxtxo1i28qk1e0c.cn-guangzhou.personal.cr.aliyuncs.com/arceus/activity-66-export:1.1.0}"
+IMAGE="${IMAGE:-crpi-quxtxo1i28qk1e0c.cn-guangzhou.personal.cr.aliyuncs.com/arceus/activity-66-export:1.3.0}"
 UPLOAD_DIR_HOST="${UPLOAD_DIR_HOST:-/opt/verifly/uploads}"
 PORT="${PORT:-8010}"
 NO_KILL="${NO_KILL:-0}"
