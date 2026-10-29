@@ -8,6 +8,7 @@
 ![登录](docs/screenshot-login.png)
 ![主界面](docs/screenshot-main.png)
 ![手机号展开](docs/screenshot-phone.png)
+![导出二次确认](docs/screenshot-confirm.png)
 
 ---
 
@@ -70,6 +71,7 @@ docker compose up -d --build      # 或 docker run，见 docs/DEPLOY.md
 | 勾选 | 单条勾选 / 全选本页；**达上限后其余复选框自动置灰** |
 | 底部操作条 | `已选 3 / 10 条 · 合计 5.3 MB` + 「导出 Excel」「打包下载 ZIP（含附件）」 |
 | 安全阀 | 附件合计超过 `MAX_EXPORT_MB` 时，打包按钮自动禁用 |
+| 导出确认 | 点导出/打包先弹确认框：显示已选条数、附件数、体积，并提示「会读取线上库与附件目录，可能影响线上响应速度」 |
 
 ## 4. 导出产物
 

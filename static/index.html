@@ -143,6 +143,19 @@
     box-shadow:0 24px 60px rgba(0,0,0,.2)}
   .modal-card h3{margin:14px 0 6px;font-size:16px}
   .modal-card p{margin:0;color:var(--ink-3);font-size:13px}
+  .modal-card.confirm{max-width:440px;text-align:left;padding:24px 26px}
+  .confirm-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .confirm-head h3{margin:0;font-size:16px}
+  .warn-dot{width:26px;height:26px;border-radius:50%;background:var(--warn-soft);color:var(--warn);
+    display:grid;place-items:center;font-weight:700;font-size:15px;flex:none}
+  .confirm-body{font-size:13px;color:var(--ink-2);line-height:1.75}
+  .confirm-body b{color:var(--ink)}
+  .confirm-stat{background:#faf8f5;border:1px solid var(--line);border-radius:10px;
+    padding:10px 14px;margin-bottom:12px;display:flex;gap:22px}
+  .confirm-stat span{font-size:12px;color:var(--ink-3)}
+  .confirm-stat strong{display:block;font-size:17px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .confirm-warn{background:var(--warn-soft);border-radius:10px;padding:10px 14px;color:#8a4416;font-size:12.5px}
+  .confirm-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
   .hidden{display:none !important}
   @media(max-width:860px){
     .stats{grid-template-columns:1fr}
@@ -253,6 +266,20 @@
 </div>
 
 <div id="toasts"></div>
+
+<div id="confirmModal" class="modal hidden">
+  <div class="modal-card confirm">
+    <div class="confirm-head">
+      <span class="warn-dot">!</span>
+      <h3 id="confirmTitle">确认导出？</h3>
+    </div>
+    <div id="confirmBody" class="confirm-body"></div>
+    <div class="confirm-actions">
+      <button class="btn" id="confirmCancel">取消</button>
+      <button class="btn primary" id="confirmOk">确认导出</button>
+    </div>
+  </div>
+</div>
 
 <div id="packing" class="modal hidden">
   <div class="modal-card">
@@ -504,6 +531,62 @@
 
   function packing(on) { $('packing').classList.toggle('hidden', !on); }
 
+  function selectionStats() {
+    const n = state.selected.size;
+    let bytes = 0;
+    state.selected.forEach((it) => { bytes += it.file_size || 0; });
+    let files = 0;
+    state.selected.forEach((it) => { files += it.file_count || 0; });
+    return { n, bytes, files };
+  }
+
+  // 导出前的二次确认
+  function askConfirm(title, bodyHtml) {
+    return new Promise((resolve) => {
+      $('confirmTitle').textContent = title;
+      $('confirmBody').innerHTML = bodyHtml;
+      $('confirmModal').classList.remove('hidden');
+
+      const finish = (ok) => {
+        $('confirmModal').classList.add('hidden');
+        $('confirmOk').removeEventListener('click', onOk);
+        $('confirmCancel').removeEventListener('click', onCancel);
+        $('confirmModal').removeEventListener('click', onBackdrop);
+        document.removeEventListener('keydown', onEsc);
+        resolve(ok);
+      };
+      const onOk = () => finish(true);
+      const onCancel = () => finish(false);
+      const onBackdrop = (e) => { if (e.target === $('confirmModal')) finish(false); };
+      const onEsc = (e) => { if (e.key === 'Escape') finish(false); };
+
+      $('confirmOk').addEventListener('click', onOk);
+      $('confirmCancel').addEventListener('click', onCancel);
+      $('confirmModal').addEventListener('click', onBackdrop);
+      document.addEventListener('keydown', onEsc);
+    });
+  }
+
+  function confirmBody(kind) {
+    const { n, bytes, files } = selectionStats();
+    const size = fmtMB(bytes);
+    const detail =
+      kind === 'zip'
+        ? `将打包 <b>${files}</b> 个附件（合计 <b>${size}</b>），文件较大，下载可能需要一段时间。`
+        : `仅导出表格（约几十 KB），不含附件原件。`;
+    return `
+      <div class="confirm-stat">
+        <div><span>已选报名</span><strong>${n} 条</strong></div>
+        <div><span>附件数量</span><strong>${files} 个</strong></div>
+        <div><span>附件体积</span><strong>${size}</strong></div>
+      </div>
+      <p style="margin:0 0 12px">${detail}</p>
+      <div class="confirm-warn">
+        导出会实时读取<b>线上数据库与附件目录</b>，占用服务器磁盘与带宽，
+        <b>可能影响线上报名页面的响应速度</b>。请谨慎操作，建议避开活动高峰时段。
+      </div>`;
+  }
+
   /* ---------------- 事件 ---------------- */
   $('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -570,12 +653,16 @@
   $('prevBtn').addEventListener('click', () => { if (state.page > 1) { state.page--; loadList(); } });
   $('nextBtn').addEventListener('click', () => { if (state.page < state.pages) { state.page++; loadList(); } });
 
-  $('xlsxBtn').addEventListener('click', () => {
+  $('xlsxBtn').addEventListener('click', async () => {
+    const ok = await askConfirm('确认导出 Excel？', confirmBody('xlsx'));
+    if (!ok) return;
     triggerDownload('/api/v1/applications.xlsx');
     toast('开始下载 Excel', 'ok');
   });
 
-  $('zipBtn').addEventListener('click', () => {
+  $('zipBtn').addEventListener('click', async () => {
+    const ok = await askConfirm('确认打包下载？', confirmBody('zip'));
+    if (!ok) return;
     packing(true);
     triggerDownload('/api/v1/bundle.zip');
     setTimeout(() => { packing(false); toast('已开始下载，请查看浏览器下载栏', 'ok'); }, 1500);
