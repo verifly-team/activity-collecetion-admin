@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 import re
+import threading
 from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import quote
@@ -50,7 +53,7 @@ _DOCS = {
 
 app = FastAPI(
     title="66th 参展申请导出服务",
-    version="1.3.0",
+    version="1.3.1",
     description=DESCRIPTION,
     lifespan=lifespan,
     **_DOCS,
@@ -270,16 +273,19 @@ def export_excel(ids: str = Query(..., description="逗号分隔的报名 id")) 
     summary="打包下载 ZIP（Excel + 附件原件）",
     dependencies=[Depends(require_token), Depends(guard_export)],
 )
-def export_bundle(ids: str = Query(..., description="逗号分隔的报名 id")) -> StreamingResponse:
+def export_bundle(
+    request: Request, ids: str = Query(..., description="逗号分隔的报名 id")
+) -> StreamingResponse:
     rows, files_map = _load(_parse_ids(ids))
-    if not _export_gate.acquire():
+    lease = _export_gate.acquire()
+    if lease is None:
         raise HTTPException(
             status_code=429,
             detail=f"当前已有 {settings.max_concurrent_exports} 个打包任务在进行，请稍后再试",
         )
     filename = quote(zip_filename())
     return StreamingResponse(
-        _gated_zip(rows, files_map),
+        _gated_zip(request, rows, files_map, lease),
         media_type="application/zip",
         headers={
             "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
@@ -288,12 +294,44 @@ def export_bundle(ids: str = Query(..., description="逗号分隔的报名 id"))
     )
 
 
-def _gated_zip(rows: list[dict], files_map: dict) -> Any:
-    """打包结束（成功/失败/中断）都要归还并发名额。"""
+_STOP = object()
+
+
+async def _gated_zip(request: Request, rows: list[dict], files_map: dict, lease: str) -> Any:
+    """流式打包 + 断连监听。
+
+    客户端中途关掉页面时，Starlette 不一定能及时关闭同步生成器，
+    名额会一直占着。这里开一个轻量协程盯着 disconnect，
+    一旦断开立刻停掉打包线程并归还名额。
+    """
+    stop = threading.Event()
+    gen = iter_zip(rows, files_map, settings.upload_path, stop)
+
+    async def watch() -> None:
+        try:
+            while True:
+                if await request.is_disconnected():
+                    stop.set()
+                    _export_gate.release(lease)
+                    return
+                await asyncio.sleep(0.5)
+        except asyncio.CancelledError:
+            raise
+
+    task = asyncio.create_task(watch())
     try:
-        yield from iter_zip(rows, files_map, settings.upload_path)
+        while True:
+            chunk = await asyncio.to_thread(next, gen, _STOP)
+            if chunk is _STOP:
+                break
+            _export_gate.touch(lease)
+            yield chunk
     finally:
-        _export_gate.release()
+        task.cancel()
+        stop.set()
+        with contextlib.suppress(Exception):
+            gen.close()
+        _export_gate.release(lease)
 
 
 if settings.static_path.is_dir() and (settings.static_path / "index.html").exists():

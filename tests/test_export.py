@@ -266,3 +266,71 @@ def test_export_rate_limited(client, monkeypatch):
     bad = client.get("/api/v1/applications.xlsx?ids=1", headers=AUTH)
     assert ok1.status_code == 200 and ok2.status_code == 200
     assert bad.status_code == 429
+
+
+# ---------------------------------------------------------------- 并发闸门 / 流式边界
+
+
+def test_concurrency_gate_basic():
+    from app.limits import ConcurrencyGate
+
+    gate = ConcurrencyGate(2, ttl=60)
+    a = gate.acquire()
+    b = gate.acquire()
+    assert a and b and a != b
+    assert gate.acquire() is None, "超过上限必须拒绝"
+    gate.release(a)
+    c = gate.acquire()
+    assert c, "释放后应能再拿到名额"
+    gate.release(b)
+    gate.release(c)
+    assert gate.active == 0
+
+
+def test_concurrency_gate_reaps_stale_lease():
+    """客户端中断、生成器没被关闭时，租约超时后必须自动回收。"""
+    import time
+
+    from app.limits import ConcurrencyGate
+
+    gate = ConcurrencyGate(1, ttl=0.2)
+    lease = gate.acquire()
+    assert lease
+    assert gate.acquire() is None
+    time.sleep(0.35)
+    assert gate.acquire(), "超时租约没被回收，功能会被永久锁死"
+
+
+def test_concurrency_gate_touch_keeps_lease():
+    """活着的任务每写一块就续租，不会被误回收。"""
+    import time
+
+    from app.limits import ConcurrencyGate
+
+    gate = ConcurrencyGate(1, ttl=0.3)
+    lease = gate.acquire()
+    for _ in range(4):
+        time.sleep(0.15)
+        gate.touch(lease)
+        assert gate.acquire() is None, "活跃任务被误回收了"
+    gate.release(lease)
+    assert gate.active == 0
+
+
+def test_zip_stop_signal_aborts_quickly():
+    """收到 stop 后打包线程要及时退出，不能卡在队列上。"""
+    import threading
+    from pathlib import Path
+
+    from app.export import iter_zip
+
+    stop = threading.Event()
+    gen = iter_zip([], {}, Path("/tmp"), stop)
+    next(gen)  # 至少能吐第一块
+    stop.set()
+    for _ in range(50):  # 最多读 50 块
+        try:
+            next(gen)
+        except StopIteration:
+            break
+    gen.close()

@@ -257,7 +257,7 @@ python -m uvicorn app.main:app --port 8010
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -q                 # 9 个用例
+pytest -q                 # 21 个用例
 ruff check app tests
 ruff format --check app tests
 python -m app.demo        # 本地预览

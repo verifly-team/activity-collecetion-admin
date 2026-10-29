@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 import queue
 import re
-import shutil
 import threading
 import zipfile
 from collections.abc import Iterator
@@ -43,9 +42,11 @@ def iter_zip(
     rows: list[dict[str, Any]],
     files_map: dict[int, list[dict[str, Any]]],
     upload_path: Path,
+    stop: threading.Event | None = None,
 ) -> Iterator[bytes]:
     """边读磁盘边吐 zip 流，内存不随包体增长。"""
     folder = zip_folder_name()
+    stop = stop or threading.Event()
     q: queue.Queue = queue.Queue(maxsize=16)
     errors: list[BaseException] = []
 
@@ -61,6 +62,8 @@ def iter_zip(
                 # ② 每家一个文件夹，只放商家自己上传的原文件
                 missing: list[str] = []
                 for row in rows:
+                    if stop.is_set():
+                        return
                     app_id = int(row["id"])
                     sub = f"{folder}/{app_id:03d}_{_safe(row.get('brand_name', ''))}"
                     used: set[str] = set()
@@ -75,7 +78,11 @@ def iter_zip(
                             name = f"{stem or name}_{len(used)}.{ext}" if ext else f"{name}_{len(used)}"
                         used.add(name)
                         with src.open("rb") as s, zf.open(f"{sub}/附件/{name}", "w") as d:
-                            shutil.copyfileobj(s, d, 1024 * 512)
+                            while not stop.is_set():
+                                buf = s.read(1024 * 512)
+                                if not buf:
+                                    break
+                                d.write(buf)
 
                 # ③ 有记录没文件的，单独留个说明，不静默跳过
                 if missing:
