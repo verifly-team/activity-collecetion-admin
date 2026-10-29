@@ -108,16 +108,31 @@ def test_list_filters(client):
     assert kw["total"] == 1 and kw["items"][0]["file_count"] == 1
 
 
-def test_csv_export(client):
-    res = client.get("/api/v1/applications.csv?ids=1,2", headers=AUTH)
+def test_excel_export(client):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    res = client.get("/api/v1/applications.xlsx?ids=1,2", headers=AUTH)
     assert res.status_code == 200
-    text = res.content.decode("utf-8")
-    assert text.startswith("\ufeff")  # BOM，Excel 直开
-    assert "报名ID" in text and "拾光中古" in text
+    assert "spreadsheetml" in res.headers["content-type"]
+
+    wb = load_workbook(BytesIO(res.content))
+    assert wb.sheetnames == ["报名清单", "代表商品", "附件清单"]
+
+    ws = wb["报名清单"]
+    assert ws["A1"].value == "报名ID"
+    assert ws.max_row == 3  # 表头 + 2 条
+    brands = [ws.cell(row=r, column=3).value for r in (2, 3)]
+    assert "拾光中古" in brands
+
+    ws3 = wb["附件清单"]
+    assert ws3.max_row >= 2
+    assert ws3["A1"].value == "报名ID"
 
 
 def test_record_limit_enforced(client):
-    res = client.get("/api/v1/applications.csv?ids=1,2,3", headers=AUTH)
+    res = client.get("/api/v1/applications.xlsx?ids=1,2,3", headers=AUTH)
     assert res.status_code == 400
     assert "最多导出 2 条" in res.json()["error"]["message"]
 
@@ -129,9 +144,11 @@ def test_bundle_zip(client):
 
     zf = zipfile.ZipFile(io.BytesIO(res.content))
     names = zf.namelist()
-    assert any("报名清单.csv" in n for n in names)
+    assert any("报名清单_" in n and n.endswith(".xlsx") for n in names)
     assert any(n.endswith("照片.zip") for n in names)
-    assert any("001_拾光中古" in n for n in names)
+    assert any("001_拾光中古/附件" in n for n in names)
+    # 不再生成 JSON
+    assert not any(n.endswith(".json") for n in names)
 
 
 def test_bundle_missing_file_listed(client):
@@ -149,6 +166,6 @@ def test_bundle_missing_file_listed(client):
 
 
 def test_token_via_query_for_download(client):
-    res = client.get("/api/v1/applications.csv?ids=1&token=test-token")
+    res = client.get("/api/v1/applications.xlsx?ids=1&token=test-token")
     assert res.status_code == 200
-    assert client.get("/api/v1/applications.csv?ids=1&token=bad").status_code == 401
+    assert client.get("/api/v1/applications.xlsx?ids=1&token=bad").status_code == 401

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from datetime import datetime
 from typing import Any
 from urllib.parse import quote
 
@@ -15,7 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from . import db
 from .auth import client_ip, require_token, verify
 from .config import settings
-from .export import csv_bytes, iter_zip
+from .excel import build_workbook, excel_filename, zip_filename
+from .export import iter_zip
 
 DESCRIPTION = """
 66th & 2nd 市集 —— **参展申请导出后台**。
@@ -159,23 +159,29 @@ def _load(ids: list[int]) -> tuple[list[dict[str, Any]], dict[int, list[dict[str
 
 
 @app.get(
-    "/api/v1/applications.csv", tags=["导出"], summary="导出清单 CSV", dependencies=[Depends(require_token)]
+    "/api/v1/applications.xlsx",
+    tags=["导出"],
+    summary="导出 Excel（报名清单 / 代表商品 / 附件清单 三个 sheet）",
+    dependencies=[Depends(require_token)],
 )
-def export_csv(ids: str = Query(..., description="逗号分隔的报名 id")) -> Response:
-    rows, _ = _load(_parse_ids(ids))
-    stamp = datetime.now().strftime("%Y%m%d_%H%M")
+def export_excel(ids: str = Query(..., description="逗号分隔的报名 id")) -> Response:
+    rows, files_map = _load(_parse_ids(ids))
     return Response(
-        content=csv_bytes(rows),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(f'报名清单_{stamp}.csv')}"},
+        content=build_workbook(rows, files_map, settings.upload_path),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(excel_filename())}"},
     )
 
 
-@app.get("/api/v1/bundle.zip", tags=["导出"], summary="打包下载 ZIP", dependencies=[Depends(require_token)])
+@app.get(
+    "/api/v1/bundle.zip",
+    tags=["导出"],
+    summary="打包下载 ZIP（Excel + 附件原件）",
+    dependencies=[Depends(require_token)],
+)
 def export_bundle(ids: str = Query(..., description="逗号分隔的报名 id")) -> StreamingResponse:
     rows, files_map = _load(_parse_ids(ids))
-    stamp = datetime.now().strftime("%Y%m%d_%H%M")
-    filename = quote(f"报名打包_{stamp}.zip")
+    filename = quote(zip_filename())
     return StreamingResponse(
         iter_zip(rows, files_map, settings.upload_path),
         media_type="application/zip",

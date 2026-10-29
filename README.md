@@ -2,7 +2,8 @@
 
 66th & 2nd 市集 —— **参展申请导出后台**（只读，独立服务）。
 
-勾选 → 导出清单 CSV / 打包下载 ZIP。**不写库、不动文件**，和采集服务完全隔离。
+勾选 → 导出 **Excel**（三个 sheet）/ 打包下载 **ZIP**（Excel + 商家上传的原附件）。
+**不写库、不动文件**，和采集服务完全隔离。
 
 ![登录](docs/screenshot-login.png)
 ![主界面](docs/screenshot-main.png)
@@ -66,35 +67,37 @@ docker compose up -d --build      # 或 docker run，见 docs/DEPLOY.md
 | 筛选 | 提交时间范围、区域（A/B/C）、关键词（品牌/联系人/手机） |
 | 表格 | ID、时间、品牌、联系人、手机、城市、意向区域、经营品类、带货件数、**附件数与大小** |
 | 勾选 | 单条勾选 / 全选本页；**达上限后其余复选框自动置灰** |
-| 底部操作条 | `已选 3 / 10 条 · 合计 5.3 MB` + 「导出清单 CSV」「打包下载 ZIP」 |
+| 底部操作条 | `已选 3 / 10 条 · 合计 5.3 MB` + 「导出 Excel」「打包下载 ZIP（含附件）」 |
 | 安全阀 | 附件合计超过 `MAX_EXPORT_MB` 时，打包按钮自动禁用 |
 
 ## 4. 导出产物
 
-**CSV**（带 BOM，Excel 双击即开）
+**Excel**（`.xlsx`，三个 sheet）
+
+| Sheet | 内容 |
+|---|---|
+| 报名清单 | 一行一个商家：ID、时间、品牌、联系人、手机、微信、邮箱、城市、主体类型、是否首次、经营品类、意向区域、带货件数、价格区间、商品结构四项百分比、附件数与大小、来源 |
+| 代表商品 | 一行一件代表商品：报名ID、品牌、商品及品牌、年代/系列、状态及来源、拟售价 |
+| 附件清单 | 一行一个附件：报名ID、品牌、文件名、类型、大小、上传时间、**包内路径**、磁盘状态 |
+
+表头加粗上色、冻结首行、自动筛选、隔行底色 —— 拿到就能直接用。
+
+**ZIP**（Excel + 附件原件）
 
 ```
-报名ID,提交时间,品牌/店铺,联系人,手机,微信,邮箱,城市,主体类型,首次参展,
-经营品类,意向区域,预计带货件数,价格区间,商品结构,代表商品,附件数,附件大小(MB),来源
-```
-
-**ZIP**
-
-```
-导出_20261029_1057/
-├── 报名清单.csv
-├── 报名清单.json
+导出_20261029_1155/
+├── 报名清单_20261029_1155.xlsx          ← 三个 sheet 的汇总表
 ├── 001_拾光中古/
-│   ├── 报名信息.json
 │   └── 附件/
-│       └── 拾光中古_1.zip
+│       ├── 拾光中古_1.zip               ← 商家上传的原文件，一字节不改
+│       ├── 拾光中古_2.zip
+│       └── 拾光中古_3.zip
 ├── 002_旧物研究所/
-└── _缺失附件清单.txt     ← 库里有记录但磁盘找不到时才会出现
+│   └── 附件/
+└── _缺失附件清单.txt                     ← 仅当库里有记录但磁盘缺口时才出现
 ```
 
 打包是**流式**的：边读磁盘边发 HTTP，不落临时文件，内存恒定几 MB。
-
----
 
 ## 5. 配置项
 
@@ -125,14 +128,14 @@ docker compose up -d --build      # 或 docker run，见 docs/DEPLOY.md
 | `POST` | `/api/v1/auth` | 校验 token，返回限制配置 |
 | `GET` | `/api/v1/summary` | 总览统计 |
 | `GET` | `/api/v1/applications` | 列表，支持 `keyword` / `zone` / `date_from` / `date_to` / `with_files` / `page` |
-| `GET` | `/api/v1/applications.csv?ids=1,2` | 导出清单 |
-| `GET` | `/api/v1/bundle.zip?ids=1,2` | 打包下载 |
+| `GET` | `/api/v1/applications.xlsx?ids=1,2` | 导出 Excel（三个 sheet） |
+| `GET` | `/api/v1/bundle.zip?ids=1,2` | 打包下载（Excel + 附件原件） |
 
 ```bash
 # 命令行导出（不走界面）
 TOKEN=你的token
 curl -H "Authorization: Bearer $TOKEN" \
-  "https://export.域名.com/api/v1/applications.csv?ids=1,2,3" -o 报名.csv
+  "https://export.域名.com/api/v1/applications.xlsx?ids=1,2,3" -o 报名清单.xlsx
 
 curl -H "Authorization: Bearer $TOKEN" \
   "https://export.域名.com/api/v1/bundle.zip?ids=1,2,3" -o 打包.zip

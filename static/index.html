@@ -240,8 +240,8 @@
         <span class="warn hidden" id="limitWarn">已达单次上限，请先取消勾选</span>
       </div>
       <div class="spacer"></div>
-      <button class="btn" id="csvBtn" disabled>导出清单 CSV</button>
-      <button class="btn primary" id="zipBtn" disabled>打包下载 ZIP</button>
+      <button class="btn" id="xlsxBtn" disabled>导出 Excel</button>
+      <button class="btn primary" id="zipBtn" disabled>打包下载 ZIP（含附件）</button>
     </div>
   </div>
 </div>
@@ -442,7 +442,7 @@
 
     $('selCount').textContent = n;
     $('selSize').textContent = fmtMB(bytes);
-    $('csvBtn').disabled = n === 0;
+    $('xlsxBtn').disabled = n === 0;
     const tooBig = bytes > state.maxMb * 1024 * 1024;
     $('zipBtn').disabled = n === 0 || tooBig;
     $('limitWarn').classList.toggle('hidden', n < state.limit);
@@ -540,9 +540,9 @@
   $('prevBtn').addEventListener('click', () => { if (state.page > 1) { state.page--; loadList(); } });
   $('nextBtn').addEventListener('click', () => { if (state.page < state.pages) { state.page++; loadList(); } });
 
-  $('csvBtn').addEventListener('click', () => {
-    triggerDownload('/api/v1/applications.csv');
-    toast('开始下载 CSV', 'ok');
+  $('xlsxBtn').addEventListener('click', () => {
+    triggerDownload('/api/v1/applications.xlsx');
+    toast('开始下载 Excel', 'ok');
   });
 
   $('zipBtn').addEventListener('click', () => {
