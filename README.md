@@ -317,6 +317,11 @@ docker logs verifly-export 2>&1 | grep AUDIT
 ## 12. 开发
 
 ```bash
+# 推之前先跑这个：完全复刻 GitHub Actions（纯净检出 + Python 3.12）
+./deploy/ci-local.sh            # 测试三步
+./deploy/ci-local.sh --docker   # 额外验证镜像构建
+
+# 手动跑也行
 pip install -r requirements-dev.txt
 pytest -q                 # 26 个用例
 ruff check app tests
