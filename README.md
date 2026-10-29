@@ -5,6 +5,9 @@
 勾选 → 导出 **Excel**（三个 sheet）/ 打包下载 **ZIP**（Excel + 商家上传的原附件）。
 **不写库、不动文件**，和采集服务完全隔离。
 
+界面风格与线上报名页 [`activity-66-portal`](../../activity-66-portal) 的 `apply.html` 保持一致：
+零圆角、墨黑主色、鼠尾草绿悬停、下划线输入框、大写加宽字距的标签。
+
 ![登录](docs/screenshot-login.png)
 ![主界面](docs/screenshot-main.png)
 ![手机号展开](docs/screenshot-phone.png)
@@ -223,7 +226,24 @@ python -m uvicorn app.main:app --port 8010
 
 ---
 
-## 10. 开发
+## 10. 设计语言
+
+与 `activity-66-portal/src/apply.css` 共用同一套变量：
+
+| 变量 | 值 | 用途 |
+|---|---|---|
+| `--ink` | `#191917` | 主文字 / 主按钮 |
+| `--paper` | `#f3f1eb` | 表头、选中行、警示块 |
+| `--muted` | `#696963` | 次要文字 |
+| `--line` | `#cac9c2` | 1px 分隔线 |
+| `--sage-deep` | `#4d6b60` | 主按钮 hover |
+| `--error` | `#a2372b` | 错误 / 警示 |
+| `--display` | Futura / Avenir Next Condensed | 数字与大写小标签 |
+| `--font` | OPPO Sans / PingFang SC | 正文 |
+
+约定：**圆角 0**、输入框只用下边框、按钮实心墨黑、小标签大写 + `.18em` 字距。
+
+## 11. 开发
 
 ```bash
 pip install -r requirements-dev.txt
