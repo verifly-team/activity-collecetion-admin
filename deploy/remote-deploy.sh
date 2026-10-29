@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 在阿里云服务器上执行：拉新镜像 → 重启容器 → 健康检查 → 失败自动回滚
 #
-#   /opt/verifly/remote-deploy.sh <完整镜像地址:tag>
+#   /verifly/activity-export/remote-deploy.sh <完整镜像地址:tag>
 #
 # 由 GitHub Actions 上传并调用，也可以手动跑。
 set -euo pipefail
@@ -9,11 +9,11 @@ set -euo pipefail
 IMAGE="${1:?用法: remote-deploy.sh <镜像地址:tag>}"
 CONTAINER="${CONTAINER:-verifly-export}"
 PORT="${PORT:-8010}"
-ENV_FILE="${ENV_FILE:-/opt/verifly/export.env}"
-UPLOAD_DIR_HOST="${UPLOAD_DIR_HOST:-/opt/verifly/uploads}"
-AUDIT_DIR_HOST="${AUDIT_DIR_HOST:-/opt/verifly/audit}"
-STATE_FILE="/opt/verifly/.last-image"
-LOG_FILE="/opt/verifly/deploy.log"
+ENV_FILE="${ENV_FILE:-/verifly/activity-export/export.env}"
+UPLOAD_DIR_HOST="${UPLOAD_DIR_HOST:-/verifly/activity/uploads}"
+AUDIT_DIR_HOST="${AUDIT_DIR_HOST:-/verifly/activity-export/audit}"
+STATE_FILE="/verifly/activity-export/.last-image"
+LOG_FILE="/verifly/activity-export/deploy.log"
 
 log() { echo "[$(date '+%F %T')] $*" | tee -a "$LOG_FILE"; }
 

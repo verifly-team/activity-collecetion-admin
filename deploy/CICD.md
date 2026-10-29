@@ -22,7 +22,7 @@
                     ▼
 ┌──────────────────────────────────────────────┐
 │ 阿里云 ECS                                   │
-│  /opt/verifly/remote-deploy.sh               │
+│  /verifly/activity-export/remote-deploy.sh               │
 │     docker pull <sha>                        │
 │     docker run（只读挂附件 + 审计目录）       │
 │     curl /healthz  × 30 次                   │
@@ -73,12 +73,12 @@ useradd -m -s /bin/bash deploy
 usermod -aG docker deploy
 
 # ③ 目录
-mkdir -p /opt/verifly/{uploads,audit,export}
-chown -R 10001:10001 /opt/verifly/uploads
-chmod 700 /opt/verifly/export
+mkdir -p /verifly/activity/{uploads,audit,export}
+chown -R 10001:10001 /verifly/activity/uploads
+chmod 700 /verifly/activity-export
 
 # ④ 配置文件（内容见 deploy/RUNBOOK.md 第 2.4 节）
-vi /opt/verifly/export.env && chmod 600 /opt/verifly/export.env
+vi /verifly/activity-export/export.env && chmod 600 /verifly/activity-export/export.env
 
 # ⑤ 把 CI 的公钥装进 deploy 用户（密钥在本机生成，见下方「SSH 密钥怎么来」）
 #    这一步在服务器上执行：
@@ -151,7 +151,7 @@ shred -u /home/deploy/.ssh/id_deploy     # 复制完立刻删掉
 | `SSH_PORT` | `22`（可选） | — |
 | `SSH_PRIVATE_KEY` | 上面 `id_deploy` 私钥**全文** | 服务器 |
 
-> ⚠️ **`EXPORT_TOKEN` 不要放进 GitHub**。它只存在于服务器 `/opt/verifly/export.env`，
+> ⚠️ **`EXPORT_TOKEN` 不要放进 GitHub**。它只存在于服务器 `/verifly/activity-export/export.env`，
 > CI 只负责发镜像，不碰任何业务密钥。
 
 ### 5. GitHub Environment（可选但建议）
@@ -178,18 +178,18 @@ Settings → Environments → New environment → `production` → 勾 **Require
 
 ## 四、部署流程细节
 
-`deploy/remote-deploy.sh` 每次由 CI 上传到服务器 `/opt/verifly/remote-deploy.sh`，
+`deploy/remote-deploy.sh` 每次由 CI 上传到服务器 `/verifly/activity-export/remote-deploy.sh`，
 保证**服务器脚本永远和仓库一致**，不会出现"改了脚本忘了同步"。
 
 它做的事：
 
-1. 读 `/opt/verifly/.last-image` 记下当前版本（回滚用）
+1. 读 `/verifly/activity-export/.last-image` 记下当前版本（回滚用）
 2. `docker pull <新镜像>` —— **拉取失败直接退出，线上不动**
 3. `docker rm -f` + `docker run` 新容器
 4. 轮询 `curl /healthz`，最多等 60 秒
 5. 成功 → 记录新版本号
 6. 失败 → **自动回滚到上一版**并报警
-7. 全过程写 `/opt/verifly/deploy.log`
+7. 全过程写 `/verifly/activity-export/deploy.log`
 
 镜像标签用 **git commit 短 SHA**（如 `a1b2c3d`），而不是 `latest`，
 这样任何一版都能精确回滚。
@@ -204,8 +204,8 @@ Settings → Environments → New environment → `production` → 勾 **Require
 curl -s localhost:8010/healthz                 # {"ok":true}
 curl -s -o /dev/null -w "%{http_code}\n" localhost:8010/docs   # 404
 docker ps --filter name=verifly-export         # Up (healthy)
-cat /opt/verifly/.last-image                   # 当前版本 tag
-tail -20 /opt/verifly/deploy.log               # 部署记录
+cat /verifly/activity-export/.last-image                   # 当前版本 tag
+tail -20 /verifly/activity-export/deploy.log               # 部署记录
 ```
 
 浏览器打开 `http://<IP>:8010/?token=<EXPORT_TOKEN>`，导出一次，
@@ -220,7 +220,7 @@ tail -20 /opt/verifly/deploy.log               # 部署记录
 | Actions 构建失败 `denied` | ACR 用户名/密码错 | 重新设置固定密码 |
 | 部署步骤 SSH 超时 | 安全组没放行 22 / 密钥不对 | 手动 `ssh -i` 试一次 |
 | 部署后 502 | 容器起来但连不上 MySQL | `docker logs verifly-export`，查 `DATABASE_URL` |
-| 自动回滚了 | 新版本健康检查失败 | 看 `/opt/verifly/deploy.log` 里的容器日志 |
+| 自动回滚了 | 新版本健康检查失败 | 看 `/verifly/activity-export/deploy.log` 里的容器日志 |
 | 想手动回滚 | — | `./remote-deploy.sh <上一版完整镜像地址>` |
 
 ---

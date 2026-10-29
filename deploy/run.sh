@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # 在服务器上启动导出服务
-#   ./deploy/run.sh /opt/verifly/export.env
-#   PORT=8020 ./deploy/run.sh /opt/verifly/export.env
+#   ./deploy/run.sh /verifly/activity-export/export.env
+#   PORT=8020 ./deploy/run.sh /verifly/activity-export/export.env
 #   NO_KILL=1 ./deploy/run.sh ...     # 端口被占用时不自动清理
 set -euo pipefail
 
 ENV_FILE="${1:-.env}"
 IMAGE="${IMAGE:-crpi-quxtxo1i28qk1e0c.cn-guangzhou.personal.cr.aliyuncs.com/arceus/activity-66-export:1.4.0}"
-UPLOAD_DIR_HOST="${UPLOAD_DIR_HOST:-/opt/verifly/uploads}"
-AUDIT_DIR_HOST="${AUDIT_DIR_HOST:-/opt/verifly/audit}"
+UPLOAD_DIR_HOST="${UPLOAD_DIR_HOST:-/verifly/activity/uploads}"
+AUDIT_DIR_HOST="${AUDIT_DIR_HOST:-/verifly/activity-export/audit}"
 PORT="${PORT:-8010}"
 NO_KILL="${NO_KILL:-0}"
 

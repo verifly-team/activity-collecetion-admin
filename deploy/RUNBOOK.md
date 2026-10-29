@@ -37,7 +37,7 @@
 ┌─────────────────────────┐      ┌──────────────────┐
 │ 采集服务 server         │─────▶│ MySQL            │
 │ :8000  可写             │      │ verifly_signup   │
-│ 上传附件 → /opt/verifly │      │ application/file │
+│ 上传附件 → /verifly/activity │      │ application/file │
 └─────────────────────────┘      └────────┬─────────┘
                                           │ 只读账号 + :ro 挂载
                                  ┌────────▼─────────┐
@@ -95,16 +95,16 @@ FLUSH PRIVILEGES;
 ### 2.3 目录与权限
 
 ```bash
-mkdir -p /opt/verifly/uploads
-chown -R 10001:10001 /opt/verifly/uploads   # 采集容器用户
-mkdir -p /opt/verifly/export
-chmod 700 /opt/verifly/export
-mkdir -p /opt/verifly/audit        # 审计日志落盘目录
+mkdir -p /verifly/activity/uploads
+chown -R 10001:10001 /verifly/activity/uploads   # 采集容器用户
+mkdir -p /verifly/activity-export
+chmod 700 /verifly/activity-export
+mkdir -p /verifly/activity-export/audit        # 审计日志落盘目录
 ```
 
 ### 2.4 配置文件
 
-`/opt/verifly/export.env`（**权限必须 600**）：
+`/verifly/activity-export/export.env`（**权限必须 600**）：
 
 ```ini
 DATABASE_URL=mysql://exporter:<强密码B>@127.0.0.1:3306/verifly_signup?charset=utf8mb4
@@ -117,7 +117,7 @@ ENABLE_DOCS=0
 ```
 
 ```bash
-chmod 600 /opt/verifly/export.env
+chmod 600 /verifly/activity-export/export.env
 head -c 30 /dev/urandom | base64 | tr -d '/+=' | head -c 40   # 生成 token
 ```
 
@@ -155,7 +155,7 @@ docker pull crpi-quxtxo1i28qk1e0c.cn-guangzhou.personal.cr.aliyuncs.com/arceus/a
 
 # 启动（自动处理端口占用、只读挂载、资源限额、健康检查）
 cd ~/verifly-activity/export-service
-./deploy/run.sh /opt/verifly/export.env
+./deploy/run.sh /verifly/activity-export/export.env
 ```
 
 预期输出：
@@ -218,10 +218,10 @@ curl -s localhost:8010/healthz
 **方式三：直接看文件**
 
 ```bash
-tail -50 /opt/verifly/audit/audit.jsonl
+tail -50 /verifly/activity-export/audit/audit.jsonl
 ```
 
-审计数据写两份：容器 stdout（长期）+ `/opt/verifly/audit/audit.jsonl`（页面读这个）。
+审计数据写两份：容器 stdout（长期）+ `/verifly/activity-export/audit/audit.jsonl`（页面读这个）。
 `run.sh` 会自动创建并挂载该目录，容器重建不丢。
 
 ### 3.3 清理孤儿附件
@@ -241,7 +241,7 @@ docker compose exec signup python -m app.cleanup --hours 24             # 真删
 mysqldump -u root -p verifly_signup | gzip > /backup/db-$(date +%F).sql.gz
 
 # 附件（每周）
-tar czf /backup/uploads-$(date +%F).tar.gz -C /opt/verifly uploads
+tar czf /backup/uploads-$(date +%F).tar.gz -C /verifly/activity uploads
 ```
 
 ### 3.5 升级版本
@@ -251,7 +251,7 @@ tar czf /backup/uploads-$(date +%F).tar.gz -C /opt/verifly uploads
 ./deploy/build-push.sh 1.3.3
 # 服务器
 docker pull .../activity-66-export:1.3.3
-IMAGE=.../activity-66-export:1.3.3 ./deploy/run.sh /opt/verifly/export.env
+IMAGE=.../activity-66-export:1.3.3 ./deploy/run.sh /verifly/activity-export/export.env
 ```
 
 `run.sh` 会自动删旧容器，**中断时间 < 5 秒**。
@@ -259,7 +259,7 @@ IMAGE=.../activity-66-export:1.3.3 ./deploy/run.sh /opt/verifly/export.env
 ### 3.6 回滚
 
 ```bash
-IMAGE=.../activity-66-export:1.3.1 ./deploy/run.sh /opt/verifly/export.env
+IMAGE=.../activity-66-export:1.3.1 ./deploy/run.sh /verifly/activity-export/export.env
 ```
 
 ---
@@ -301,7 +301,7 @@ curl -s -o /dev/null -w "%{http_code}\n" localhost:8010/api/v1/applications
 docker inspect verifly-export | grep -A3 '"Source"'
 
 # 5. 配置文件权限
-stat -c "%a %n" /opt/verifly/export.env    # 应该是 600
+stat -c "%a %n" /verifly/activity-export/export.env    # 应该是 600
 
 # 6. 容器非 root
 docker exec verifly-export id -u            # 应该是 10002（容器内用户 exporter）

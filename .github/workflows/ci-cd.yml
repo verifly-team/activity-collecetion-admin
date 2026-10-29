@@ -104,14 +104,14 @@ jobs:
         run: |
           scp -i ~/.ssh/id_deploy -P "${{ secrets.SSH_PORT || 22 }}" \
             deploy/remote-deploy.sh \
-            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/opt/verifly/remote-deploy.sh"
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/verifly/activity-export/remote-deploy.sh"
 
       - name: 执行部署
         run: |
           ssh -i ~/.ssh/id_deploy -p "${{ secrets.SSH_PORT || 22 }}" \
             "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
-            "chmod +x /opt/verifly/remote-deploy.sh && \
-             /opt/verifly/remote-deploy.sh \
+            "chmod +x /verifly/activity-export/remote-deploy.sh && \
+             /verifly/activity-export/remote-deploy.sh \
                '${{ env.IMAGE_NAME }}:${{ needs.build.outputs.tag }}'"
 
       - name: 部署结果

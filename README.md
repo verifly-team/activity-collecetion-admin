@@ -189,7 +189,7 @@ HOST=0.0.0.0 ./run-demo.sh                      # 服务器上对外预览
 ```bash
 pip install -r requirements.txt
 DATABASE_URL='mysql://exporter:密码@127.0.0.1:3306/verifly_signup?charset=utf8mb4' \
-UPLOAD_DIR=/opt/verifly/uploads \
+UPLOAD_DIR=/verifly/activity/uploads \
 EXPORT_TOKEN=你的token \
 uvicorn app.main:app --host 127.0.0.1 --port 8010
 ```
@@ -201,10 +201,10 @@ uvicorn app.main:app --host 127.0.0.1 --port 8010
 ./deploy/build-push.sh 1.1.0
 
 # 启动（自动带 :ro 只读挂载、资源限额、健康检查）
-./deploy/run.sh /opt/verifly/export.env
+./deploy/run.sh /verifly/activity-export/export.env
 ```
 
-`/opt/verifly/export.env` 至少要有：
+`/verifly/activity-export/export.env` 至少要有：
 
 ```ini
 DATABASE_URL=mysql://exporter:<密码>@127.0.0.1:3306/verifly_signup?charset=utf8mb4
@@ -288,7 +288,7 @@ docker logs verifly-export 2>&1 | grep AUDIT
 写两份：
 
 1. **容器 stdout** —— `docker logs` 长期留存（已配 20MB × 3 份轮转）
-2. **`/opt/verifly/audit/audit.jsonl`** —— 页面读这个，容器重建不丢
+2. **`/verifly/activity-export/audit/audit.jsonl`** —— 页面读这个，容器重建不丢
 
 文件超过 20000 行自动只保留最新 20000 行。
 
