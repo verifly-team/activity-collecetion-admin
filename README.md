@@ -247,32 +247,50 @@ python -m uvicorn app.main:app --port 8010
 
 ## 10. 审计日志
 
-所有敏感操作都会写一行结构化日志到 stdout，`docker logs` 直接可查：
+### 页面上看
+
+顶栏点 **「审计日志」** → 直接列出所有操作，可按类型筛选：
+
+| 时间 | 操作 | 来源 IP | 明细 |
+|---|---|---|---|
+| 2026-10-29 15:31:06 | 查看手机号 | 127.0.0.1 | 报名 #3 |
+| 2026-10-29 15:31:06 | 打包完成 | 127.0.0.1 | 已发送 11.4 MB |
+| 2026-10-29 15:31:06 | 打包下载 | 127.0.0.1 | 报名 1 · 1 条 · 附件 3 个 · 11.4 MB |
+| 2026-10-29 15:31:06 | 导出 Excel | 127.0.0.1 | 报名 1,2 · 2 条 · 附件 5 个 |
+
+对应接口：`GET /api/v1/audit?limit=300&event=export_zip`（需 token）。
+
+### 命令行看
 
 ```bash
 docker logs verifly-export 2>&1 | grep AUDIT
+./deploy/audit.sh            # 汇总
+./deploy/audit.sh aborted    # 没下完的打包
+./deploy/audit.sh ids 12     # 谁动过 12 号报名
 ```
 
-| event | 何时触发 | 记录内容 |
+### 记录哪些操作
+
+| event | 触发 | 字段 |
 |---|---|---|
-| `reveal_phone` | 点眼睛看完整手机号 | 报名 ID、IP、UA |
-| `export_xlsx` | 导出 Excel | 报名 ID 列表、条数、附件数、IP、UA |
-| `export_zip` | 开始打包 | 报名 ID 列表、条数、附件数、合计 MB、IP、UA |
-| `export_zip_done` | 打包结束/中断 | 实际发出字节数、MB、`aborted=1` 表示没下完 |
+| `reveal_phone` | 点眼睛看完整手机号 | `application_id` |
+| `export_xlsx` | 导出 Excel | `ids`、`count`、`files` |
+| `export_zip` | 开始打包 | `ids`、`count`、`files`、`mb` |
+| `export_zip_done` | 打包结束 | `bytes`、`mb`、`aborted` |
 
-样例：
+每条都带 `ts`（时间）、`ip`、`ua`（浏览器）。
 
-```
-2026-10-29 15:09:41 AUDIT event=export_xlsx ip=10.0.0.9 ua=Mozilla/5.0 ids=1,2,3 count=3 files=6
-2026-10-29 15:09:42 AUDIT event=export_zip ip=10.0.0.9 ua=Mozilla/5.0 ids=1,2 count=2 files=5 mb=22.1
-2026-10-29 15:09:44 AUDIT event=export_zip_done ip=10.0.0.9 ua=Mozilla/5.0 bytes=5777870 mb=5.5 aborted=1
-2026-10-29 15:09:45 AUDIT event=reveal_phone ip=10.0.0.9 ua=Mozilla/5.0 application_id=1
-```
+### 存在哪
 
-`aborted=1` 说明这次打包没下载完（用户中途关页面或网络断了），
-结合 `mb` 能看出流出去了多少。
+写两份：
 
-> 审计只写日志文件，**不写数据库** —— 导出服务的数据库账号是只读的，物理上写不进去。
+1. **容器 stdout** —— `docker logs` 长期留存（已配 20MB × 3 份轮转）
+2. **`/opt/verifly/audit/audit.jsonl`** —— 页面读这个，容器重建不丢
+
+文件超过 20000 行自动只保留最新 20000 行。
+
+> **为什么不建数据库表？** 导出服务的数据库账号是**只读**的，建表就要给它 `INSERT` 权限，
+> 打破"物理上改不了数据"这条底线。审计只追加、不查询详情，日志文件完全够用。
 
 ---
 
@@ -297,7 +315,7 @@ docker logs verifly-export 2>&1 | grep AUDIT
 
 ```bash
 pip install -r requirements-dev.txt
-pytest -q                 # 23 个用例
+pytest -q                 # 24 个用例
 ruff check app tests
 ruff format --check app tests
 python -m app.demo        # 本地预览

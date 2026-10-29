@@ -34,6 +34,9 @@ class Settings:
         self.event_name = os.getenv("EVENT_NAME", "66th & 2nd Vintage Fashion Show & Market")
         self.allow_origins = _env_list("ALLOWED_ORIGINS", "*") or ["*"]
         self.static_dir = os.getenv("STATIC_DIR", "static")
+
+        # ---- 审计 ----
+        self.audit_log_path = os.getenv("AUDIT_LOG_PATH", "data/audit.jsonl")
         # /docs、/redoc、/openapi.json 是否公开；生产建议关闭
         self.enable_docs = os.getenv("ENABLE_DOCS", "0").lower() in ("1", "true", "yes")
 
@@ -44,6 +47,10 @@ class Settings:
     @property
     def upload_path(self) -> Path:
         return Path(self.upload_dir)
+
+    @property
+    def audit_path(self) -> Path:
+        return Path(self.audit_log_path)
 
     @property
     def static_path(self) -> Path:

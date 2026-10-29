@@ -6,13 +6,15 @@
 set -euo pipefail
 
 ENV_FILE="${1:-.env}"
-IMAGE="${IMAGE:-crpi-quxtxo1i28qk1e0c.cn-guangzhou.personal.cr.aliyuncs.com/arceus/activity-66-export:1.3.2}"
+IMAGE="${IMAGE:-crpi-quxtxo1i28qk1e0c.cn-guangzhou.personal.cr.aliyuncs.com/arceus/activity-66-export:1.4.0}"
 UPLOAD_DIR_HOST="${UPLOAD_DIR_HOST:-/opt/verifly/uploads}"
+AUDIT_DIR_HOST="${AUDIT_DIR_HOST:-/opt/verifly/audit}"
 PORT="${PORT:-8010}"
 NO_KILL="${NO_KILL:-0}"
 
 [ -f "$ENV_FILE" ] || { echo "找不到配置文件：$ENV_FILE"; exit 1; }
 [ -d "$UPLOAD_DIR_HOST" ] || { echo "附件目录不存在：$UPLOAD_DIR_HOST"; exit 1; }
+mkdir -p "$AUDIT_DIR_HOST"
 
 # ---------------------------------------------------------------- 清理旧容器与端口
 docker rm -f verifly-export >/dev/null 2>&1 || true
@@ -58,7 +60,9 @@ docker run -d \
   --network host \
   --env-file "$ENV_FILE" \
   -e UPLOAD_DIR=/data/uploads \
+  -e AUDIT_LOG_PATH=/data/audit/audit.jsonl \
   -v "$UPLOAD_DIR_HOST:/data/uploads:ro" \
+  -v "$AUDIT_DIR_HOST:/data/audit" \
   --cpus=1 --memory=512m \
   --log-opt max-size=20m --log-opt max-file=3 \
   "$IMAGE" \

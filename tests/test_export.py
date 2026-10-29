@@ -12,6 +12,7 @@ os.environ.setdefault("UPLOAD_DIR", f"{BASE}/uploads")
 os.environ.setdefault("EXPORT_TOKEN", "test-token")
 os.environ.setdefault("MAX_EXPORT_RECORDS", "2")
 os.environ.setdefault("MAX_EXPORT_MB", "50")
+os.environ.setdefault("AUDIT_LOG_PATH", f"{BASE}/audit.jsonl")
 
 from app.main import app  # noqa: E402
 
@@ -339,33 +340,44 @@ def test_zip_stop_signal_aborts_quickly():
 # ---------------------------------------------------------------- 审计日志
 
 
-def test_export_xlsx_writes_audit(client, monkeypatch):
-    from app import main as m
+def _audit_lines():
+    import json as _json
 
-    lines: list[str] = []
+    path = f"{BASE}/audit.jsonl"
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as f:
+        return [_json.loads(x) for x in f if x.strip()]
 
-    class _Fake:
-        def info(self, msg, *a):
-            lines.append(msg % a if a else msg)
 
-    monkeypatch.setattr(m, "logger", _Fake())
+def test_export_writes_audit_file(client):
+    before = len(_audit_lines())
     client.get("/api/v1/applications.xlsx?ids=1,2", headers=AUTH)
-    hit = [x for x in lines if "event=export_xlsx" in x]
-    assert hit, f"没有导出审计：{lines}"
-    assert "count=2" in hit[0]
-    assert "ids=1,2" in hit[0]
-    assert "ip=" in hit[0]
+    lines = _audit_lines()
+    assert len(lines) > before, "导出没有写审计"
+    last = lines[-1]
+    assert last["event"] == "export_xlsx"
+    assert last["count"] == 2
+    assert last["ids"] == "1,2"
+    assert last.get("ip")
+    assert "ts" in last
 
 
-def test_reveal_phone_writes_audit(client, monkeypatch):
-    from app import main as m
-
-    lines: list[str] = []
-
-    class _Fake:
-        def info(self, msg, *a):
-            lines.append(msg % a if a else msg)
-
-    monkeypatch.setattr(m, "logger", _Fake())
+def test_reveal_phone_writes_audit(client):
     client.get("/api/v1/applications/1/phone", headers=AUTH)
-    assert any("event=reveal_phone" in x and "application_id=1" in x for x in lines), lines
+    hit = [x for x in _audit_lines() if x["event"] == "reveal_phone"]
+    assert hit and hit[-1]["application_id"] == 1
+
+
+def test_audit_api(client):
+    client.get("/api/v1/applications.xlsx?ids=1", headers=AUTH)
+    res = client.get("/api/v1/audit?limit=10", headers=AUTH)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["ok"] and body["count"] >= 1
+    assert all("ts" in i and "event" in i for i in body["items"])
+    # 按类型过滤
+    only = client.get("/api/v1/audit?event=export_xlsx", headers=AUTH).json()
+    assert all(i["event"] == "export_xlsx" for i in only["items"])
+    # 需要 token
+    assert client.get("/api/v1/audit").status_code == 401

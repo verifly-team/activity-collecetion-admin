@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import db
+from .audit import AuditLog
 from .auth import client_ip, require_token, verify
 from .config import settings
 from .excel import build_workbook, excel_filename, zip_filename
@@ -32,15 +33,12 @@ if not logger.handlers:  # 保证审计日志一定落到 stdout（docker logs �
     logger.propagate = False
 
 
+_audit_log = AuditLog(settings.audit_path)
+
+
 def _audit(event: str, request: Request | None = None, **fields: Any) -> None:
-    """统一审计格式，一条一行，docker logs / 日志文件都能直接 grep。"""
-    parts = [f"event={event}"]
-    if request is not None:
-        parts.append(f"ip={client_ip(request)}")
-        ua = (request.headers.get("user-agent") or "").replace(" ", "_")[:80]
-        parts.append(f"ua={ua}")
-    parts.extend(f"{k}={v}" for k, v in fields.items())
-    logger.info(" ".join(parts))
+    """统一审计：写 stdout（docker logs 长期留存）+ JSONL（页面可查）。"""
+    _audit_log.record(event, request, **fields)
 
 
 DESCRIPTION = """
@@ -65,7 +63,7 @@ _DOCS = {
 
 app = FastAPI(
     title="66th 参展申请导出服务",
-    version="1.3.2",
+    version="1.4.0",
     description=DESCRIPTION,
     lifespan=lifespan,
     **_DOCS,
@@ -242,6 +240,20 @@ def _load(ids: list[int]) -> tuple[list[dict[str, Any]], dict[int, list[dict[str
             detail=f"所选附件合计 {mb:.0f}MB，超过 {settings.max_bundle_mb}MB 上限，请减少勾选",
         )
     return rows, db.get_files_by_application([int(r["id"]) for r in rows])
+
+
+@app.get(
+    "/api/v1/audit",
+    tags=["系统"],
+    summary="审计日志（最近 N 条）",
+    dependencies=[Depends(require_token)],
+)
+def read_audit(
+    limit: int = Query(200, ge=1, le=2000),
+    event: str | None = Query(None, description="按操作类型过滤，如 export_zip"),
+) -> dict:
+    items = _audit_log.tail(limit=limit, event=event)
+    return {"ok": True, "count": len(items), "items": items}
 
 
 @app.get(

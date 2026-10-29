@@ -99,6 +99,7 @@ mkdir -p /opt/verifly/uploads
 chown -R 10001:10001 /opt/verifly/uploads   # 采集容器用户
 mkdir -p /opt/verifly/export
 chmod 700 /opt/verifly/export
+mkdir -p /opt/verifly/audit        # 审计日志落盘目录
 ```
 
 ### 2.4 配置文件
@@ -184,6 +185,10 @@ curl -s localhost:8010/healthz
 
 ### 3.2 审计查询
 
+**方式一：页面（推荐）** —— 顶栏点「审计日志」，可筛选操作类型。
+
+**方式二：命令行**
+
 ```bash
 ./deploy/audit.sh                # 汇总
 ./deploy/audit.sh zip            # 谁打包过
@@ -191,6 +196,15 @@ curl -s localhost:8010/healthz
 ./deploy/audit.sh ids 12         # 谁动过 12 号报名
 ./deploy/audit.sh today          # 今天的操作统计
 ```
+
+**方式三：直接看文件**
+
+```bash
+tail -50 /opt/verifly/audit/audit.jsonl
+```
+
+审计数据写两份：容器 stdout（长期）+ `/opt/verifly/audit/audit.jsonl`（页面读这个）。
+`run.sh` 会自动创建并挂载该目录，容器重建不丢。
 
 ### 3.3 清理孤儿附件
 
@@ -281,6 +295,7 @@ docker exec verifly-export id -u            # 应该是 10002（容器内用户 
 
 | 版本 | 内容 |
 |---|---|
+| 1.4.0 | 审计日志页面 + JSONL 落盘持久化 |
 | 1.3.2 | 导出审计日志（`export_xlsx` / `export_zip` / `export_zip_done`） |
 | 1.3.1 | 修复中断下载导致打包名额泄漏（会永久锁死打包功能） |
 | 1.3.0 | 安全加固 6 项：Excel 注入、token 泄漏、限流、响应头、docs 开关、锁版本 |
