@@ -343,6 +343,8 @@
   const state = {
     token: sessionStorage.getItem('export_token') || '',
     items: [], selected: new Map(),
+    phones: new Map(),      // id -> 完整号码（本次会话缓存）
+    shownPhones: new Set(), // 当前展开的行
     page: 1, pages: 1, total: 0,
     limit: 10, maxMb: 300,
     zone: '', keyword: '', from: '', to: '',
@@ -432,6 +434,8 @@
     state.token = '';
     sessionStorage.removeItem('export_token');
     state.selected.clear();
+    state.phones.clear();
+    state.shownPhones.clear();
     $('appView').classList.add('hidden');
     $('loginView').classList.remove('hidden');
   }
@@ -491,9 +495,9 @@
           <td class="mono">${fmtTime(it.created_at)}</td>
           <td><strong>${esc(it.brand_name)}</strong></td>
           <td>${esc(it.contact_name || '—')}</td>
-          <td class="mono phone-cell" data-phone="${esc(it.phone || '')}">
+          <td class="mono phone-cell" data-id="${it.id}">
             <span class="phone-text">${esc(maskPhone(it.phone))}</span>
-            ${it.phone ? `<button type="button" class="eye" title="显示号码" aria-label="显示号码">${EYE.off}</button>` : ''}
+            ${it.phone ? `<button type="button" class="eye" title="查看完整号码" aria-label="查看完整号码">${EYE.off}</button>` : ''}
           </td>
           <td>${esc(it.city || '—')}</td>
           <td>${zones || '—'}</td>
@@ -506,20 +510,57 @@
         cb.addEventListener('change', () => toggle(Number(cb.dataset.id), cb.checked));
       });
       tb.querySelectorAll('.eye').forEach((btn) => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
           const cell = btn.closest('.phone-cell');
+          const id = Number(cell.dataset.id);
           const text = cell.querySelector('.phone-text');
-          const full = cell.dataset.phone;
-          const shown = btn.dataset.shown === '1';
-          text.textContent = shown ? maskPhone(full) : full;
-          btn.dataset.shown = shown ? '0' : '1';
-          btn.innerHTML = shown ? EYE.off : EYE.on;
-          btn.title = shown ? '显示号码' : '隐藏号码';
-          btn.setAttribute('aria-label', btn.title);
-          cell.classList.toggle('revealed', !shown);
+          const row = state.items.find((x) => x.id === id);
+          const masked = maskPhone(row && row.phone);
+
+          if (state.shownPhones.has(id)) {
+            state.shownPhones.delete(id);
+            text.textContent = masked;
+            btn.innerHTML = EYE.off;
+            btn.title = '查看完整号码';
+            cell.classList.remove('revealed');
+            return;
+          }
+
+          let full = state.phones.get(id);
+          if (!full) {
+            btn.disabled = true;
+            try {
+              const res = await api(`/api/v1/applications/${id}/phone`);
+              full = res.phone;
+              state.phones.set(id, full);
+            } catch (e) {
+              toast(e.message || '获取号码失败', 'err');
+              return;
+            } finally {
+              btn.disabled = false;
+            }
+          }
+          state.shownPhones.add(id);
+          text.textContent = full;
+          btn.innerHTML = EYE.on;
+          btn.title = '收起号码';
+          cell.classList.add('revealed');
         });
       });
     }
+    // 重渲染后恢复已展开的手机号
+    tb.querySelectorAll('.phone-cell').forEach((cell) => {
+      const id = Number(cell.dataset.id);
+      if (!state.shownPhones.has(id)) return;
+      const full = state.phones.get(id);
+      const btn = cell.querySelector('.eye');
+      if (!full || !btn) return;
+      cell.querySelector('.phone-text').textContent = full;
+      btn.innerHTML = EYE.on;
+      btn.title = '收起号码';
+      cell.classList.add('revealed');
+    });
+
     $('pageInfo').textContent = `第 ${state.page} / ${state.pages} 页 · 共 ${state.total} 条`;
     $('prevBtn').disabled = state.page <= 1;
     $('nextBtn').disabled = state.page >= state.pages;

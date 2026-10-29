@@ -77,7 +77,7 @@ docker compose up -d --build      # 或 docker run，见 docs/DEPLOY.md
 |---|---|
 | 顶部统计 | 报名总数 / 附件数量 / 附件总体积 |
 | 筛选 | 提交时间范围、区域（A/B/C）、关键词（品牌/联系人/手机） |
-| 表格 | ID、时间、品牌、联系人、**手机（默认脱敏，点「显示」才展开）**、城市、意向区域、经营品类、带货件数、**附件数与大小** |
+| 表格 | ID、时间、品牌、联系人、**手机（接口返回即脱敏，点眼睛才调接口取完整号）**、城市、意向区域、经营品类、带货件数、**附件数与大小** |
 | 勾选 | 单条勾选 / 全选本页；**达上限后其余复选框自动置灰** |
 | 底部操作条 | `已选 3 / 10 条 · 合计 5.3 MB` + 「导出 Excel」「打包下载 ZIP（含附件）」 |
 | 安全阀 | 附件合计超过 `MAX_EXPORT_MB` 时，打包按钮自动禁用 |
@@ -140,7 +140,8 @@ docker compose up -d --build      # 或 docker run，见 docs/DEPLOY.md
 | `GET` | `/healthz` | 健康检查（含 DB ping） |
 | `POST` | `/api/v1/auth` | 校验 token，返回限制配置 |
 | `GET` | `/api/v1/summary` | 总览统计 |
-| `GET` | `/api/v1/applications` | 列表，支持 `keyword` / `zone` / `date_from` / `date_to` / `with_files` / `page` |
+| `GET` | `/api/v1/applications` | 列表，支持 `keyword` / `zone` / `date_from` / `date_to` / `with_files` / `page`；**手机号已脱敏** |
+| `GET` | `/api/v1/applications/{id}/phone` | 取完整手机号（**会写审计日志**：id / IP / UA） |
 | `GET` | `/api/v1/applications.xlsx?ids=1,2` | 导出 Excel（三个 sheet） |
 | `GET` | `/api/v1/bundle.zip?ids=1,2` | 打包下载（Excel + 附件原件） |
 

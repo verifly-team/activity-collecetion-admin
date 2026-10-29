@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import quote
@@ -16,6 +17,14 @@ from .auth import client_ip, require_token, verify
 from .config import settings
 from .excel import build_workbook, excel_filename, zip_filename
 from .export import iter_zip
+
+logger = logging.getLogger("export.audit")
+if not logger.handlers:  # 保证审计日志一定落到 stdout（docker logs 可见）
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(asctime)s AUDIT %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
 
 DESCRIPTION = """
 66th & 2nd 市集 —— **参展申请列表**。
@@ -156,6 +165,26 @@ def _load(ids: list[int]) -> tuple[list[dict[str, Any]], dict[int, list[dict[str
             detail=f"所选附件合计 {mb:.0f}MB，超过 {settings.max_bundle_mb}MB 上限，请减少勾选",
         )
     return rows, db.get_files_by_application([int(r["id"]) for r in rows])
+
+
+@app.get(
+    "/api/v1/applications/{application_id}/phone",
+    tags=["数据"],
+    summary="查看完整手机号（会记审计日志）",
+    dependencies=[Depends(require_token)],
+)
+def reveal_phone(application_id: int, request: Request) -> dict:
+    """列表接口只返回 138****8000，需要完整号码时单独调这个接口。"""
+    phone = db.get_phone(application_id)
+    if phone is None:
+        raise HTTPException(status_code=404, detail="报名记录不存在")
+    logger.info(
+        "reveal_phone application_id=%s ip=%s ua=%s",
+        application_id,
+        client_ip(request),
+        (request.headers.get("user-agent") or "")[:80],
+    )
+    return {"ok": True, "application_id": application_id, "phone": phone}
 
 
 @app.get(

@@ -169,3 +169,38 @@ def test_token_via_query_for_download(client):
     res = client.get("/api/v1/applications.xlsx?ids=1&token=test-token")
     assert res.status_code == 200
     assert client.get("/api/v1/applications.xlsx?ids=1&token=bad").status_code == 401
+
+
+def test_phone_masked_in_list(client):
+    """列表接口不应返回完整号码。"""
+    data = client.get("/api/v1/applications", headers=AUTH).json()
+    phones = [it["phone"] for it in data["items"]]
+    assert phones, "应有数据"
+    for p in phones:
+        assert "****" in p, f"号码未脱敏：{p}"
+    assert all("13800138000" not in p for p in phones)
+
+
+def test_reveal_phone_endpoint(client):
+    res = client.get("/api/v1/applications/1/phone", headers=AUTH)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["phone"] == "13800138000"
+    assert body["application_id"] == 1
+
+
+def test_reveal_phone_requires_token(client):
+    assert client.get("/api/v1/applications/1/phone").status_code == 401
+    assert client.get("/api/v1/applications/999/phone", headers=AUTH).status_code == 404
+
+
+def test_export_still_has_full_phone(client):
+    """导出 Excel 是给业务用的，需要完整号码。"""
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+
+    res = client.get("/api/v1/applications.xlsx?ids=1", headers=AUTH)
+    wb = load_workbook(BytesIO(res.content))
+    ws = wb["报名清单"]
+    assert ws.cell(row=2, column=5).value == "13800138000"

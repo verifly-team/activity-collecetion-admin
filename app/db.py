@@ -85,6 +85,18 @@ def ping() -> None:
         _rows(conn, "SELECT 1 AS ok")
 
 
+def mask_phone(phone: str | None) -> str:
+    """138****8000 —— 列表接口只给脱敏号码，完整号码要走单独接口。"""
+    v = str(phone or "")
+    if not v:
+        return ""
+    if len(v) >= 11:
+        return v[:3] + "****" + v[-4:]
+    if len(v) >= 7:
+        return v[:2] + "****" + v[-2:]
+    return v[:1] + "***"
+
+
 def _decode(row: dict[str, Any]) -> dict[str, Any]:
     for col in ("zones", "categories"):
         if isinstance(row.get(col), str):
@@ -154,7 +166,10 @@ def list_applications(
             f"{_BASE_SQL} {clause} ORDER BY a.id DESC LIMIT ? OFFSET ?",
             [*args, page_size, (page - 1) * page_size],
         )
-    return [_decode(r) for r in rows], int(total)
+    items = [_decode(r) for r in rows]
+    for item in items:
+        item["phone"] = mask_phone(item.get("phone"))
+    return items, int(total)
 
 
 def get_applications(ids: list[int]) -> list[dict[str, Any]]:
@@ -165,6 +180,13 @@ def get_applications(ids: list[int]) -> list[dict[str, Any]]:
     with get_conn() as conn:
         rows = _rows(conn, f"{_BASE_SQL} WHERE a.id IN ({marks}) ORDER BY a.id", list(ids))
     return [_decode(r) for r in rows]
+
+
+def get_phone(application_id: int) -> str | None:
+    """仅用于「点开查看」时取完整手机号。"""
+    with get_conn() as conn:
+        rows = _rows(conn, "SELECT phone FROM application WHERE id = ?", [application_id])
+    return rows[0]["phone"] if rows else None
 
 
 def get_files_by_application(ids: list[int]) -> dict[int, list[dict[str, Any]]]:
