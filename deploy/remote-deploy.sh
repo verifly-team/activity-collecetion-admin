@@ -9,12 +9,15 @@ set -euo pipefail
 IMAGE="${1:?用法: remote-deploy.sh <镜像地址:tag>}"
 CONTAINER="${CONTAINER:-verifly-export}"
 PORT="${PORT:-8010}"
+HEALTH_TRIES="${HEALTH_TRIES:-30}"
+HEALTH_INTERVAL="${HEALTH_INTERVAL:-2}"
 ENV_FILE="${ENV_FILE:-/verifly/activity-export/export.env}"
 UPLOAD_DIR_HOST="${UPLOAD_DIR_HOST:-/verifly/activity/uploads}"
 AUDIT_DIR_HOST="${AUDIT_DIR_HOST:-/verifly/activity-export/audit}"
-STATE_FILE="/verifly/activity-export/.last-image"
-LOG_FILE="/verifly/activity-export/deploy.log"
+STATE_FILE="${STATE_FILE:-/verifly/activity-export/.last-image}"
+LOG_FILE="${LOG_FILE:-/verifly/activity-export/deploy.log}"
 
+mkdir -p "$(dirname "$LOG_FILE")"
 log() { echo "[$(date '+%F %T')] $*" | tee -a "$LOG_FILE"; }
 
 # ---------------------------------------------------------------- 上次的镜像（用于回滚）
@@ -54,17 +57,33 @@ start_container() {
 }
 
 health_check() {
-  for _ in $(seq 1 30); do
+  for _ in $(seq 1 "$HEALTH_TRIES"); do
     if curl -sf "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1; then
       return 0
     fi
-    sleep 2
+    sleep "$HEALTH_INTERVAL"
   done
   return 1
 }
 
 log "启动容器…"
-start_container "$IMAGE"
+# 注意：不能用裸调用 —— set -e 会在 docker run 失败时直接退出，跳过回滚
+if ! start_container "$IMAGE"; then
+  log "❌ 新容器启动失败"
+  docker logs --tail 30 "$CONTAINER" >>"$LOG_FILE" 2>&1 || true
+  if [ -n "$PREV" ]; then
+    log "回滚到：$PREV"
+    start_container "$PREV" || true
+    if health_check; then
+      log "⚠️  已回滚到 ${PREV}（新版本 $IMAGE 启动失败）"
+    else
+      log "❌ 回滚后仍不健康，需要人工处理"
+    fi
+  else
+    log "没有上一个版本可回滚，需要人工处理"
+  fi
+  exit 1
+fi
 
 if health_check; then
   echo "$IMAGE" > "$STATE_FILE"
@@ -85,7 +104,7 @@ fi
 log "回滚到：$PREV"
 start_container "$PREV"
 if health_check; then
-  log "⚠️  已回滚到 $PREV（新版本 $IMAGE 有问题，请检查）"
+  log "⚠️  已回滚到 ${PREV}（新版本 $IMAGE 有问题，请检查）"
   exit 1
 else
   log "❌ 回滚也失败了，需要人工处理：docker logs $CONTAINER"
