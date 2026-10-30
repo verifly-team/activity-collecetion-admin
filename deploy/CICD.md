@@ -1,5 +1,14 @@
 # CI/CD 方案：GitHub Actions → 阿里云
 
+> **当前使用两条流水线**
+>
+> | 文件 | 触发 | 说明 |
+> |---|---|---|
+> | `.github/workflows/deploy-source.yml` | **push main 自动** + 手动 | **主流程**：源码传到服务器构建，不需要镜像仓库 |
+> | `.github/workflows/ci-cd.yml` | **仅手动** | 备用：构建镜像推阿里云 ACR 再部署（ACR 可用时再用） |
+>
+> 下面第一~四节讲的是镜像仓库版；主流程只需要看「七、源码构建流水线」。
+
 > 一次 `git push`，自动跑测试 → 构建镜像 → 推阿里云镜像仓库 → SSH 到服务器重启容器 → 健康检查失败自动回滚。
 
 ---
@@ -240,3 +249,33 @@ tail -20 /verifly/activity-export/deploy.log               # 部署记录
 | GitHub Actions（私有仓库） | 每月 2000 分钟免费；本项目单次约 2 分钟 |
 | 阿里云 ACR 个人版 | 免费（3 个仓库、500MB 存储起） |
 | 流量 | 镜像约 120MB，每月几次可忽略 |
+
+---
+
+## 七、源码构建流水线（当前主流程）
+
+`deploy-source.yml`，特点：
+
+- **不需要镜像仓库**，ACR 权限问题完全绕开
+- 源码打包（约 200KB）scp 到服务器，服务器上 `docker build`
+- 镜像打时间戳标签（`20261030-162445-e270fa1`），保留最近 5 个
+- 部署前**先自检服务器环境**（docker、export.env、附件目录、磁盘）
+- 构建失败 → 线上保持不动
+- 健康检查失败 → **自动回滚到上一版镜像**
+
+流程：
+
+```
+push main
+  → 测试（ruff + pytest）
+  → 打包源码 tar.gz
+  → 服务器自检
+  → 上传 + docker build（tag=时间戳-sha）
+  → 重启容器 → curl /healthz × 30
+     成功 → 记录 .last-image
+     失败 → 用上一版镜像重启
+```
+
+**需要的 Secrets 只有 3 个**：`SSH_HOST`、`SSH_USER`、`SSH_PRIVATE_KEY`（+ 可选 `SSH_PORT`）。
+
+**服务器只需装好 Docker**，不需要登录任何镜像仓库。

@@ -1,11 +1,9 @@
-name: CI/CD
+name: CI/CD（镜像仓库版·手动）
 
+# 备用流水线：需要阿里云 ACR 可用。
+# 默认只能手动触发，不会随 push 自动跑。
+# 主流程见 deploy-source.yml（源码直接传到服务器构建）。
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - "docs/**"
-      - "**.md"
   workflow_dispatch:
     inputs:
       skip_tests:
@@ -13,7 +11,7 @@ on:
         type: boolean
         default: false
       deploy:
-        description: "构建成功后部署到服务器（第一次建议取消勾选，先验证构建）"
+        description: "构建成功后部署到服务器"
         type: boolean
         default: true
 

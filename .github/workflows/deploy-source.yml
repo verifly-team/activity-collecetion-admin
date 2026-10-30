@@ -1,0 +1,193 @@
+name: 部署（源码构建·主流程）
+
+# 不依赖镜像仓库：源码传到服务器，在服务器上 docker build 后重启。
+# 服务器需准备：Docker、/verifly/activity-export/export.env、/verifly/activity/uploads
+#
+#   push main -> 自动测试 + 部署
+#   手动触发   -> 可跳过测试直接部署
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+      - ".github/workflows/ci-cd.yml"
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: "跳过测试"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-source
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: 测试
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_tests }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 安装依赖
+        run: pip install -r requirements-dev.txt
+
+      - name: 代码风格
+        run: |
+          ruff check app tests
+          ruff format --check app tests
+
+      - name: 单元测试
+        run: pytest -q
+
+  deploy:
+    name: 部署到服务器
+    runs-on: ubuntu-latest
+    needs: test
+    if: ${{ always() && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
+    environment: acr
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 准备 SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+      - name: 打包源码
+        run: |
+          tar czf /tmp/src.tar.gz \
+            --exclude='.git' --exclude='.venv' --exclude='demo' \
+            --exclude='__pycache__' --exclude='.pytest_cache' \
+            --exclude='.ruff_cache' --exclude='docs' .
+          ls -lh /tmp/src.tar.gz
+
+      - name: 上传源码
+        run: |
+          SSH_OPTS="-i ~/.ssh/id_deploy -p ${{ secrets.SSH_PORT || 22 }} -o StrictHostKeyChecking=accept-new"
+          TARGET="${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
+          ssh $SSH_OPTS "$TARGET" 'mkdir -p /verifly/activity-export/src'
+          scp -i ~/.ssh/id_deploy -P "${{ secrets.SSH_PORT || 22 }}" -o StrictHostKeyChecking=accept-new \
+            /tmp/src.tar.gz "$TARGET:/verifly/activity-export/src.tar.gz"
+
+      - name: 服务器环境自检
+        run: |
+          ssh -i ~/.ssh/id_deploy -p "${{ secrets.SSH_PORT || 22 }}" \
+            -o StrictHostKeyChecking=accept-new \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" 'bash -s' <<'REMOTE'
+          set -uo pipefail
+          fail=0
+          say() { printf '  %s\n' "$1"; }
+          echo "== 服务器环境检查 =="
+          command -v docker >/dev/null 2>&1 && say "docker 已安装" || { say "缺 docker"; fail=1; }
+          docker ps >/dev/null 2>&1 && say "docker 可用" || { say "当前用户不能操作 docker"; fail=1; }
+          [ -f /verifly/activity-export/export.env ] && say "export.env 存在" \
+            || { say "缺 /verifly/activity-export/export.env"; fail=1; }
+          [ -d /verifly/activity/uploads ] && say "附件目录存在" \
+            || { say "缺 /verifly/activity/uploads"; fail=1; }
+          mkdir -p /verifly/activity-export/audit /verifly/activity-export/src 2>/dev/null \
+            && say "目录可写" || { say "/verifly/activity-export 不可写"; fail=1; }
+          df -h /verifly 2>/dev/null | tail -1 | awk '{print "  磁盘剩余：" $4}'
+          exit $fail
+          REMOTE
+
+      - name: 构建并重启
+        env:
+          SHA_SHORT: ${{ github.sha }}
+        run: |
+          ssh -i ~/.ssh/id_deploy -p "${{ secrets.SSH_PORT || 22 }}" \
+            -o StrictHostKeyChecking=accept-new \
+            "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "SHA_SHORT='${SHA_SHORT:0:7}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd /verifly/activity-export
+
+          TAG="$(date +%Y%m%d-%H%M%S)-${SHA_SHORT}"
+          PREV="$(cat .last-image 2>/dev/null || echo '')"
+          echo "==> 新版本：$TAG   当前版本：${PREV:-无}"
+
+          mkdir -p src
+          find src -mindepth 1 -delete 2>/dev/null || true
+          tar xzf src.tar.gz -C src
+          rm -f src.tar.gz
+
+          echo "==> 构建镜像"
+          if ! docker build -t "verifly-export:$TAG" -t verifly-export:latest src; then
+            echo "构建失败，线上保持不动"
+            exit 1
+          fi
+
+          start_container() {
+            local img="$1"
+            docker rm -f verifly-export >/dev/null 2>&1 || true
+            docker run -d \
+              --name verifly-export \
+              --restart unless-stopped \
+              --network host \
+              --env-file /verifly/activity-export/export.env \
+              -e UPLOAD_DIR=/data/uploads \
+              -e AUDIT_LOG_PATH=/data/audit/audit.jsonl \
+              -v /verifly/activity/uploads:/data/uploads:ro \
+              -v /verifly/activity-export/audit:/data/audit \
+              --cpus=1 --memory=512m \
+              --log-opt max-size=20m --log-opt max-file=3 \
+              "$img" \
+              uvicorn app.main:app --host 0.0.0.0 --port 8010 --workers 1
+          }
+
+          healthy() {
+            for _ in $(seq 1 30); do
+              curl -sf http://127.0.0.1:8010/healthz >/dev/null 2>&1 && return 0
+              sleep 2
+            done
+            return 1
+          }
+
+          echo "==> 启动新版本"
+          if ! start_container "verifly-export:$TAG"; then
+            echo "容器启动失败，回滚"
+            if [ -n "$PREV" ]; then
+              start_container "verifly-export:$PREV" && healthy && echo "已回滚到 $PREV"
+            fi
+            exit 1
+          fi
+
+          if healthy; then
+            echo "$TAG" > .last-image
+            echo "部署成功：$TAG"
+            docker ps --filter name=verifly-export --format '   {{.Status}}'
+            # 清理旧镜像：必须容忍 grep 无匹配（首次部署只有 latest），否则 pipefail 会让脚本返回非 0
+            { docker images verifly-export --format '{{.Tag}}' | grep -v '^latest$' \
+              | tail -n +6 | while read -r t; do docker rmi "verifly-export:$t" >/dev/null 2>&1 || true; done; } || true
+            exit 0
+          fi
+
+          echo "健康检查失败，容器日志："
+          docker logs --tail 40 verifly-export || true
+          if [ -n "$PREV" ]; then
+            echo "==> 回滚到 $PREV"
+            start_container "verifly-export:$PREV"
+            if healthy; then echo "已回滚到 $PREV"; else echo "回滚后仍不健康，需人工处理"; fi
+          else
+            echo "没有上一版可回滚，请人工处理"
+          fi
+          exit 1
+          REMOTE
+
+      - name: 部署结果
+        if: always()
+        run: |
+          echo "提交：${{ github.sha }}"
+          echo "分支：${{ github.ref_name }}"

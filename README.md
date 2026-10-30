@@ -29,7 +29,11 @@
 **[deploy/RUNBOOK.md](deploy/RUNBOOK.md)**。
 
 自动化发布（GitHub Actions → 阿里云）见 **[deploy/CICD.md](deploy/CICD.md)**：
-推 `main` 自动测试 → 构建镜像 → 推 ACR → SSH 部署 → 健康检查失败自动回滚。
+
+| 流水线 | 触发 | 说明 |
+|---|---|---|
+| `deploy-source.yml` | push main | **主流程**：源码传到服务器构建，不需要镜像仓库，失败自动回滚 |
+| `ci-cd.yml` | 仅手动 | 备用：推镜像到 ACR 再部署 |
 
 审计日志查询：`./deploy/audit.sh`（`summary` / `zip` / `xlsx` / `phone` / `aborted` / `ids 12` / `today`）。
 
