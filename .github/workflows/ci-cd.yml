@@ -109,7 +109,9 @@ jobs:
       # 经典 docker build + docker push 推的是最普通的 V2 清单，兼容性最好。
       - name: 构建镜像
         run: |
-          TAG="${{ needs.build.outputs.tag }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          echo "镜像标签：$TAG"
+          [ -n "$TAG" ] || { echo "::error::镜像标签为空"; exit 1; }
           docker build \
             --platform linux/amd64 \
             -t "$IMAGE_NAME:$TAG" \
@@ -118,13 +120,13 @@ jobs:
 
       - name: 推送镜像
         run: |
-          TAG="${{ needs.build.outputs.tag }}"
+          TAG="${{ steps.meta.outputs.tag }}"
           docker push "$IMAGE_NAME:$TAG"
           docker push "$IMAGE_NAME:latest"
 
       - name: 校验镜像确实在仓库里
         run: |
-          TAG="${{ needs.build.outputs.tag }}"
+          TAG="${{ steps.meta.outputs.tag }}"
           if docker manifest inspect "$IMAGE_NAME:$TAG" > /dev/null 2>&1; then
             echo "✅ 镜像已推送：$IMAGE_NAME:$TAG"
           else

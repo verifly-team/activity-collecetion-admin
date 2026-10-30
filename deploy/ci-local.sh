@@ -22,24 +22,28 @@ if command -v python3.12 >/dev/null 2>&1; then
   PY="python3.12"   # 与 CI 一致
 fi
 
-echo "==> 1/5 纯净检出（只有 git 跟踪的文件）"
+echo "==> 1/6 纯净检出（只有 git 跟踪的文件）"
 mkdir -p "$SRC"
 git archive HEAD | tar -x -C "$SRC"
 echo "    $(find "$SRC" -type f | wc -l | tr -d ' ') 个文件 → $SRC"
 
-echo "==> 2/5 新建虚拟环境（$($PY --version 2>&1)）"
+echo "==> 2/6 新建虚拟环境（$($PY --version 2>&1)）"
 "$PY" -m venv "$VENV"
 "$VENV/bin/pip" install -q --upgrade pip >/dev/null 2>&1 || true
 
-echo "==> 3/5 安装依赖（requirements-dev.txt）"
+echo "==> 3/6 安装依赖（requirements-dev.txt）"
 "$VENV/bin/pip" install -q -r "$SRC/requirements-dev.txt"
 
 cd "$SRC"
-echo "==> 4/5 代码风格"
+echo "==> 4/6 workflow 引用检查"
+"$VENV/bin/pip" install -q pyyaml
+"$PY" deploy/ci-lint.py
+
+echo "==> 5/6 代码风格"
 "$VENV/bin/ruff" check app tests
 "$VENV/bin/ruff" format --check app tests
 
-echo "==> 5/5 单元测试（pytest -q，与 CI 完全相同）"
+echo "==> 6/6 单元测试（pytest -q，与 CI 完全相同）"
 "$VENV/bin/pytest" -q
 
 if [ "$WITH_DOCKER" = "1" ]; then
