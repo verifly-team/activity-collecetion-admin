@@ -31,15 +31,25 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !inputs.skip_tests }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
 
+      - name: 环境信息
+        run: |
+          python --version
+          pip --version
+          echo "--- 工作目录 ---"
+          pwd && ls -1
+
       - name: 安装依赖（含测试依赖）
         run: pip install -r requirements-dev.txt
+
+      - name: 依赖清单
+        run: pip freeze
 
       - name: 代码风格
         run: |
@@ -58,7 +68,7 @@ jobs:
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: 生成镜像标签
         id: meta
@@ -97,7 +107,7 @@ jobs:
     # GitHub → Settings → Environments 里建的环境名，必须完全一致
     environment: acr
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: 准备 SSH
         run: |
