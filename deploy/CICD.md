@@ -223,7 +223,7 @@ tail -20 /verifly/activity-export/deploy.log               # 部署记录
 
 | 现象 | 原因 | 处理 |
 |---|---|---|
-| `denied: unknown manifest class for application/vnd.oci.empty.v1+json` | ACR 个人版不支持 BuildKit 的证明清单 | workflow 已设 `provenance: false` / `sbom: false`，并带经典 builder 兜底 |
+| `denied: unknown manifest class for application/vnd.oci.empty.v1+json` | ACR 个人版不支持 BuildKit 的证明清单 | workflow 已改为经典 `docker build` + `docker push`，不产生证明清单 |
 | Actions 构建失败 `denied` | ACR 用户名/密码错 | 重新设置固定密码 |
 | 部署步骤 SSH 超时 | 安全组没放行 22 / 密钥不对 | 手动 `ssh -i` 试一次 |
 | 部署后 502 | 容器起来但连不上 MySQL | `docker logs verifly-export`，查 `DATABASE_URL` |
