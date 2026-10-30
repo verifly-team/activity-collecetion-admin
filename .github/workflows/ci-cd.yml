@@ -25,7 +25,12 @@ permissions:
   contents: read
 
 env:
-  IMAGE_NAME: ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/${{ secrets.ACR_REPO }}
+  # 仓库地址不是机密，直接写在这里 —— 这样日志里能看到完整镜像名，排查方便
+  # 换仓库时改这三行即可
+  ACR_REGISTRY: crpi-quxtxo1i28qk1e0c.cn-guangzhou.personal.cr.aliyuncs.com
+  ACR_NAMESPACE: arceus
+  ACR_REPO: activity-66-export
+  IMAGE_NAME: crpi-quxtxo1i28qk1e0c.cn-guangzhou.personal.cr.aliyuncs.com/arceus/activity-66-export
 
 jobs:
   # ---------------------------------------------------------------- 1. 测试
@@ -77,33 +82,23 @@ jobs:
         id: meta
         run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - name: 检查 Secrets 是否就位
+      - name: 检查配置与 Secrets
         env:
-          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
-          ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
-          ACR_REPO: ${{ secrets.ACR_REPO }}
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
         run: |
-          echo "ACR_REGISTRY  长度=${#ACR_REGISTRY}  值=$ACR_REGISTRY"
-          echo "ACR_NAMESPACE 长度=${#ACR_NAMESPACE} 值=$ACR_NAMESPACE"
-          echo "ACR_REPO      长度=${#ACR_REPO}      值=$ACR_REPO"
-          echo "ACR_USERNAME  长度=${#ACR_USERNAME}  （值不打印）"
-          echo "ACR_PASSWORD  长度=${#ACR_PASSWORD}  （值不打印）"
+          echo "目标镜像：$IMAGE_NAME"
+          echo "登录用户：长度=${#ACR_USERNAME}"
+          echo "登录密码：长度=${#ACR_PASSWORD}"
           miss=0
-          for v in ACR_REGISTRY ACR_NAMESPACE ACR_REPO ACR_USERNAME ACR_PASSWORD; do
+          for v in ACR_USERNAME ACR_PASSWORD; do
             if [ -z "${!v}" ]; then
               echo "::error::缺少 Secret: $v"
               miss=1
             fi
           done
           if [ "$miss" = "1" ]; then
-            echo ""
-            echo "排查顺序："
-            echo "1. Settings → Secrets and variables → Actions → 【Repository secrets】"
-            echo "   （注意不是 Environments 里的，build job 没有 environment，读不到环境级 Secret）"
-            echo "2. 检查名字是否完全一致，大小写敏感"
-            echo "3. ACR 密码必须是控制台「访问凭证」里设的固定密码，不是阿里云登录密码"
+            echo "去 Settings → Secrets and variables → Actions（Repository secrets）配置"
             exit 1
           fi
 
@@ -124,7 +119,16 @@ jobs:
       - name: 推送镜像
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
-          docker push "$IMAGE_NAME:$TAG"
+          echo "推送目标：$IMAGE_NAME:$TAG"
+          if ! docker push "$IMAGE_NAME:$TAG"; then
+            echo ""
+            echo "::error::推送被拒绝（denied）—— 按下面顺序排查："
+            echo "1. ACR 控制台里【命名空间】是否叫 $ACR_NAMESPACE"
+            echo "2. 该命名空间下是否已【创建仓库】$ACR_REPO（个人版必须先建仓库）"
+            echo "3. 登录账号是否是命名空间所有者，或 RAM 用户有推送权限"
+            echo "4. 仓库类型（私有/公开）与账号是否匹配"
+            exit 1
+          fi
           docker push "$IMAGE_NAME:latest"
 
       - name: 校验镜像确实在仓库里

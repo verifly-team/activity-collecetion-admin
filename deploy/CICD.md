@@ -141,17 +141,18 @@ shred -u /home/deploy/.ssh/id_deploy     # 复制完立刻删掉
 
 ### 4. GitHub Secrets（仓库 → Settings → Secrets and variables → Actions）
 
-| Secret 名 | 值 | 从哪来 |
+| Secret 名 | 值 | 必填 |
 |---|---|---|
-| `ACR_REGISTRY` | `crpi-quxtxo1i28qk1e0c.cn-guangzhou.personal.cr.aliyuncs.com` | ACR 控制台 |
-| `ACR_NAMESPACE` | `arceus` | ACR 命名空间 |
-| `ACR_REPO` | `activity-66-export` | ACR 仓库名 |
-| `ACR_USERNAME` | 阿里云账号全名 | ACR 访问凭证 |
-| `ACR_PASSWORD` | 固定密码 | ACR 访问凭证 |
-| `SSH_HOST` | 服务器公网 IP | — |
-| `SSH_USER` | `deploy` | — |
-| `SSH_PORT` | `22`（可选） | — |
-| `SSH_PRIVATE_KEY` | 上面 `id_deploy` 私钥**全文** | 服务器 |
+| `ACR_USERNAME` | 阿里云账号全名（ACR → 访问凭证） | ✅ |
+| `ACR_PASSWORD` | ACR「访问凭证」里的**固定密码**（不是阿里云登录密码） | ✅ |
+| `SSH_HOST` | 服务器公网 IP | ✅ |
+| `SSH_USER` | `deploy` | ✅ |
+| `SSH_PRIVATE_KEY` | 部署私钥全文（含 BEGIN/END 两行） | ✅ |
+| `SSH_PORT` | SSH 端口，默认 22 | 可选 |
+
+> 仓库地址（`ACR_REGISTRY` / `ACR_NAMESPACE` / `ACR_REPO`）**不是机密**，
+> 直接写在 workflow 的 `env:` 里，这样日志里能看到完整镜像名，排查方便。
+> 换仓库时改 workflow 顶部那三行。
 
 > ⚠️ **`EXPORT_TOKEN` 不要放进 GitHub**。它只存在于服务器 `/verifly/activity-export/export.env`，
 > CI 只负责发镜像，不碰任何业务密钥。
