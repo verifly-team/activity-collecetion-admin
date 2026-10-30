@@ -37,7 +37,7 @@ echo "==> 3/6 安装依赖（requirements-dev.txt）"
 cd "$SRC"
 echo "==> 4/6 workflow 引用检查"
 "$VENV/bin/pip" install -q pyyaml
-"$PY" deploy/ci-lint.py
+"$VENV/bin/python" deploy/ci-lint.py
 
 echo "==> 5/6 代码风格"
 "$VENV/bin/ruff" check app tests
