@@ -74,6 +74,36 @@ jobs:
         id: meta
         run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
+      - name: 检查 Secrets 是否就位
+        env:
+          ACR_REGISTRY: ${{ secrets.ACR_REGISTRY }}
+          ACR_NAMESPACE: ${{ secrets.ACR_NAMESPACE }}
+          ACR_REPO: ${{ secrets.ACR_REPO }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+        run: |
+          echo "ACR_REGISTRY  长度=${#ACR_REGISTRY}  值=$ACR_REGISTRY"
+          echo "ACR_NAMESPACE 长度=${#ACR_NAMESPACE} 值=$ACR_NAMESPACE"
+          echo "ACR_REPO      长度=${#ACR_REPO}      值=$ACR_REPO"
+          echo "ACR_USERNAME  长度=${#ACR_USERNAME}  （值不打印）"
+          echo "ACR_PASSWORD  长度=${#ACR_PASSWORD}  （值不打印）"
+          miss=0
+          for v in ACR_REGISTRY ACR_NAMESPACE ACR_REPO ACR_USERNAME ACR_PASSWORD; do
+            if [ -z "${!v}" ]; then
+              echo "::error::缺少 Secret: $v"
+              miss=1
+            fi
+          done
+          if [ "$miss" = "1" ]; then
+            echo ""
+            echo "排查顺序："
+            echo "1. Settings → Secrets and variables → Actions → 【Repository secrets】"
+            echo "   （注意不是 Environments 里的，build job 没有 environment，读不到环境级 Secret）"
+            echo "2. 检查名字是否完全一致，大小写敏感"
+            echo "3. ACR 密码必须是控制台「访问凭证」里设的固定密码，不是阿里云登录密码"
+            exit 1
+          fi
+
       - uses: docker/setup-buildx-action@v3
 
       - name: 登录阿里云容器镜像服务
